@@ -151,16 +151,16 @@ export default function NowPlayingPage() {
       await api.post('/favorites', {
         track_title: currentTitle,
         track_author: currentAuthor,
-        track_url: track.url || track.identifier,
-        track_identifier: track.identifier,
+        track_url: (track as any).track_url || track.url || track.identifier || 'unknown',
+        track_identifier: track.identifier || (track as any).track_identifier || null,
         duration_ms: track.duration_ms || track.duration || 0,
-        source: track.source || 'unknown',
-        artwork_url: track.artwork_url,
+        source: track.source || (track as any).source || 'unknown',
+        artwork_url: track.artwork_url || (track as any).artworkUrl || null,
       });
       setActionFeedback('Added to Favorites');
       setTimeout(() => setActionFeedback(''), 2000);
-    } catch {
-      alert('Failed to add to favorites');
+    } catch (e: any) {
+      alert(`Failed to add to favorites: ${e.message || 'Unknown error'}`);
     }
   };
 
@@ -170,11 +170,11 @@ export default function NowPlayingPage() {
       await api.post(`/playlists/${playlistId}/tracks`, {
         track_title: currentTitle || 'Unknown Title',
         track_author: currentAuthor || 'Unknown Artist',
-        track_url: track.url || track.identifier || 'unknown-url',
-        track_identifier: track.identifier || 'unknown-id',
+        track_url: (track as any).track_url || track.url || track.identifier || 'unknown',
+        track_identifier: track.identifier || (track as any).track_identifier || null,
         duration_ms: track.duration_ms || track.duration || 0,
-        source: track.source || 'unknown',
-        artwork_url: track.artwork_url || '',
+        source: track.source || (track as any).source || 'unknown',
+        artwork_url: track.artwork_url || (track as any).artworkUrl || null,
       });
       setShowPlaylistMenu(false);
       setActionFeedback('Added to Playlist');
@@ -414,6 +414,9 @@ export default function NowPlayingPage() {
 
             <div className="mx-auto w-full max-w-2xl">
               <div className="mb-2 flex items-center justify-center gap-5">
+                <button onClick={handleAddFavorite} title="Add to Favorites" className="text-zinc-400 transition hover:text-emerald-400 hover:scale-110">
+                  <Icon name="star" className="h-4 w-4" />
+                </button>
                 <button onClick={() => sendCommand('shuffle')} title="Shuffle" className="text-zinc-400 transition hover:text-white">
                   <Icon name="sliders" className="h-4 w-4" />
                 </button>

@@ -45,27 +45,71 @@ class ConnectionManager:
             for ws in dead:
                 self.active_connections[guild_id].discard(ws)
 
+    async def handle_track_start(self, payload: dict):
+        from app.core.database import async_session_factory
+        from sqlalchemy import select
+        from app.models.guild import DiscordGuild
+        from app.models.user import User
+        from app.services.history_service import HistoryService
+        from app.schemas.history import PlayHistoryCreate
+        
+        guild_discord_id = payload.get("guild_discord_id")
+        user_discord_id = payload.get("requested_by_discord_id")
+        
+        async with async_session_factory() as db:
+            guild_result = await db.execute(select(DiscordGuild).filter(DiscordGuild.discord_guild_id == guild_discord_id))
+            guild = guild_result.scalar_one_or_none()
+            if not guild:
+                return
+            
+            user_id = None
+            if user_discord_id:
+                user_result = await db.execute(select(User).filter(User.discord_id == user_discord_id))
+                user = user_result.scalar_one_or_none()
+                if user:
+                    user_id = user.id
+            
+            history_data = PlayHistoryCreate(
+                guild_id=guild.id,
+                track_title=payload.get("track_title") or "Unknown",
+                track_author=payload.get("track_author") or "Unknown",
+                track_url=payload.get("track_url") or "",
+                track_identifier=payload.get("track_identifier") or "",
+                source=payload.get("source") or "unknown",
+                duration_ms=payload.get("duration_ms") or 0,
+                requested_by_user_id=user_id,
+            )
+            
+            await HistoryService(db).record(user_id=user_id, data=history_data)
+            await db.commit()
+
     async def start_redis_subscriber(self):
         """Subscribe to Redis pub/sub for player state events."""
         pubsub = redis_client.pubsub()
-        await pubsub.psubscribe("player:*")
-        logger.info("Redis subscriber started for player:* channels")
+        await pubsub.psubscribe("player:*", "bot_event:*")
+        logger.info("Redis subscriber started for player:* and bot_event:* channels")
 
         async for message in pubsub.listen():
             if message["type"] == "pmessage":
                 channel = message["channel"]
-                # channel format: player:<guild_id>
-                guild_id = channel.split(":", 1)[1] if ":" in channel else None
-                if guild_id:
+                if channel.startswith("player:"):
+                    guild_id = channel.split(":", 1)[1] if ":" in channel else None
+                    if guild_id:
+                        try:
+                            raw = json.loads(message["data"])
+                            # Normalize bot's camelCase to snake_case for the web client
+                            normalized = normalize_bot_state(raw)
+                            await self.broadcast_to_guild(guild_id, normalized)
+                        except json.JSONDecodeError:
+                            logger.warning("Failed to decode player state for guild %s", guild_id)
+                        except Exception as e:
+                            logger.error("Error broadcasting to guild %s: %s", guild_id, e)
+                elif channel == "bot_event:track_start":
                     try:
-                        raw = json.loads(message["data"])
-                        # Normalize bot's camelCase to snake_case for the web client
-                        normalized = normalize_bot_state(raw)
-                        await self.broadcast_to_guild(guild_id, normalized)
-                    except json.JSONDecodeError:
-                        logger.warning("Failed to decode player state for guild %s", guild_id)
+                        payload = json.loads(message["data"])
+                        await self.handle_track_start(payload)
                     except Exception as e:
-                        logger.error("Error broadcasting to guild %s: %s", guild_id, e)
+                        logger.error("Failed to handle track start event: %s", e)
 
     def start_background_subscriber(self):
         self._subscriber_task = asyncio.create_task(self.start_redis_subscriber())

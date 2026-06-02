@@ -18,14 +18,15 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadDashboard() {
       try {
-        const [guildsData, historyData] = await Promise.all([
+        const [guildsData, historyData, statsData] = await Promise.all([
           api.get<GuildAccess[]>('/guilds/my').catch(() => []),
           api.get<TrackHistoryEntry[]>('/history?limit=5').catch(() => []),
+          api.get<{ total_users: number, active_players: number }>('/stats').catch(() => ({ total_users: 0, active_players: 0 })),
         ]);
         setStats({
-          active_players: 0,
+          active_players: statsData?.active_players || 0,
           total_guilds: Array.isArray(guildsData) ? guildsData.length : 0,
-          total_users: 0,
+          total_users: statsData?.total_users || 0,
           recent_tracks: Array.isArray(historyData) ? historyData : [],
         });
       } catch {

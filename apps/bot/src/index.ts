@@ -166,6 +166,30 @@ async function main() {
            }
            break;
          }
+        case 'remove': {
+          const q = musicManager.getQueue(guildId);
+          if (typeof command.index === 'number') {
+            q.remove(command.index);
+            await musicManager.publishState(guildId);
+          }
+          break;
+        }
+        case 'move': {
+          const q = musicManager.getQueue(guildId);
+          if (typeof command.from === 'number' && typeof command.to === 'number') {
+            q.move(command.from, command.to);
+            await musicManager.publishState(guildId);
+          }
+          break;
+        }
+        case 'jump': {
+          const q = musicManager.getQueue(guildId);
+          if (typeof command.index === 'number') {
+            const track = q.jump(command.index);
+            if (track) await musicManager.playTrack(guildId, track);
+          }
+          break;
+        }
       }
     } catch (e) {
       console.error('[WebCommand] Error:', e);
@@ -258,6 +282,7 @@ async function main() {
         artworkUrl: track.artwork_url || track.artworkUrl,
         source: track.source,
         requestedBy: 'Web Panel',
+        requestedById: user_discord_id,
       };
 
       if (action === 'queue') {

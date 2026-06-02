@@ -179,6 +179,23 @@ export class MusicManager {
     const queue = this.getQueue(guildId);
     queue.current = track;
 
+    try {
+      const payload = {
+        guild_discord_id: guildId,
+        track_title: track.title,
+        track_author: track.author,
+        track_url: track.url || track.identifier,
+        track_identifier: track.identifier,
+        source: track.source,
+        duration_ms: track.duration,
+        requested_by_discord_id: (track as any).requestedById || null
+      };
+      console.log(`[MusicManager] Publishing track_start:`, payload);
+      await this.redis.publish("bot_event:track_start", JSON.stringify(payload));
+    } catch (e) {
+      console.error("[Redis] Failed to publish track_start event:", e);
+    }
+
     if (track.encoded) {
       await player.playTrack({ track: { encoded: track.encoded } });
       await this.publishState(guildId);

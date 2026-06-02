@@ -32,6 +32,12 @@ export interface FavoriteTrack {
   id: number;
   track_title: string;
   track_author?: string | null;
+  track_url: string;
+  track_identifier?: string | null;
+  source?: string | null;
+  duration_ms?: number | null;
+  artwork_url?: string | null;
+  created_at?: string;
 }
 
 export interface PlaylistSummary {
