@@ -1,0 +1,107 @@
+/**
+ * Queue Manager — per-guild queue with loop, shuffle, history
+ */
+
+import { QueueTrack, LoopMode } from '../types';
+
+export class QueueManager {
+  public tracks: QueueTrack[] = [];
+  public history: QueueTrack[] = [];
+  public current: QueueTrack | null = null;
+  public loopMode: LoopMode = 'off';
+  public volume: number = 80;
+
+  add(track: QueueTrack): void {
+    this.tracks.push(track);
+  }
+
+  addNext(track: QueueTrack): void {
+    this.tracks.unshift(track);
+  }
+
+  addMany(tracks: QueueTrack[]): void {
+    this.tracks.push(...tracks);
+  }
+
+  next(): QueueTrack | null {
+    if (this.loopMode === 'track' && this.current) {
+      return this.current;
+    }
+
+    if (this.current) {
+      this.history.push(this.current);
+      if (this.history.length > 100) this.history.shift();
+    }
+
+    if (this.loopMode === 'queue' && this.tracks.length === 0 && this.history.length > 0) {
+      this.tracks = [...this.history];
+      this.history = [];
+    }
+
+    const next = this.tracks.shift() || null;
+    this.current = next;
+    return next;
+  }
+
+  previous(): QueueTrack | null {
+    const prev = this.history.pop();
+    if (prev) {
+      if (this.current) {
+        this.tracks.unshift(this.current);
+      }
+      this.current = prev;
+      return prev;
+    }
+    return null;
+  }
+
+  remove(index: number): QueueTrack | null {
+    if (index < 0 || index >= this.tracks.length) return null;
+    return this.tracks.splice(index, 1)[0] || null;
+  }
+
+  move(from: number, to: number): boolean {
+    if (from < 0 || from >= this.tracks.length || to < 0 || to >= this.tracks.length) return false;
+    const [track] = this.tracks.splice(from, 1);
+    this.tracks.splice(to, 0, track);
+    return true;
+  }
+
+  jump(index: number): QueueTrack | null {
+    if (index < 0 || index >= this.tracks.length) return null;
+    // Skip everything before the index
+    const skipped = this.tracks.splice(0, index);
+    if (this.current) this.history.push(this.current);
+    this.history.push(...skipped);
+    const track = this.tracks.shift() || null;
+    this.current = track;
+    return track;
+  }
+
+  shuffle(): void {
+    for (let i = this.tracks.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.tracks[i], this.tracks[j]] = [this.tracks[j], this.tracks[i]];
+    }
+  }
+
+  clear(): void {
+    this.tracks = [];
+  }
+
+  get length(): number {
+    return this.tracks.length;
+  }
+
+  get isEmpty(): boolean {
+    return this.tracks.length === 0;
+  }
+
+  get totalDuration(): number {
+    return this.tracks.reduce((acc, t) => acc + (t.duration || 0), 0);
+  }
+
+  toJSON(): Array<QueueTrack & { position: number }> {
+    return this.tracks.map((t, i) => ({ ...t, position: i }));
+  }
+}

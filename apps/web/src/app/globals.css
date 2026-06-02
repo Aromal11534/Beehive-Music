@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+:root {
+  --color-primary: #f59e0b;
+  --color-primary-hover: #d97706;
+  --color-primary-light: #fbbf24;
+  --color-surface: #18181b;
+  --color-surface-raised: #27272a;
+  --color-border: #3f3f46;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #18181b;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.15); }
+  50% { box-shadow: 0 0 40px rgba(245, 158, 11, 0.3); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.5s ease-out;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* Glass card */
+.glass-card {
+  background: rgba(39, 39, 42, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(63, 63, 70, 0.5);
+  border-radius: 16px;
+}
+
+/* Progress bar */
+.progress-track {
+  background: #3f3f46;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-fill {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.player-seeker::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.player-seeker::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: #fbbf24;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.16), 0 0 18px rgba(245, 158, 11, 0.45);
+}
+
+.player-seeker::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.player-seeker::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #fbbf24;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.16), 0 0 18px rgba(245, 158, 11, 0.45);
+}
+
+.spotify-seeker::-webkit-slider-runnable-track,
+.spotify-volume::-webkit-slider-runnable-track {
+  height: 20px;
+  background: transparent;
+}
+
+.spotify-seeker::-webkit-slider-thumb,
+.spotify-volume::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: #fff;
+  opacity: 0;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.spotify-volume {
+  background: linear-gradient(#fff, #fff) 0 50% / var(--volume-fill, 40%) 4px no-repeat, linear-gradient(#52525b, #52525b) 0 50% / 100% 4px no-repeat;
+  border-radius: 999px;
+}
+
+.spotify-seeker:hover::-webkit-slider-thumb,
+.spotify-seeker:focus-visible::-webkit-slider-thumb,
+.spotify-volume:hover::-webkit-slider-thumb,
+.spotify-volume:focus-visible::-webkit-slider-thumb {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.spotify-seeker::-moz-range-track,
+.spotify-volume::-moz-range-track {
+  height: 20px;
+  background: transparent;
+}
+
+.spotify-seeker::-moz-range-thumb,
+.spotify-volume::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  opacity: 0;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.spotify-seeker:hover::-moz-range-thumb,
+.spotify-seeker:focus-visible::-moz-range-thumb,
+.spotify-volume:hover::-moz-range-thumb,
+.spotify-volume:focus-visible::-moz-range-thumb {
+  opacity: 1;
+  transform: scale(1.05);
+}
