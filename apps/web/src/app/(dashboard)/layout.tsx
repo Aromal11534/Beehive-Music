@@ -140,7 +140,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             </div>
             <div className="text-xs text-zinc-600 font-medium">
-              beehive.syncify.in
+              beehive.teamsyndicate.org
             </div>
           </header>
 

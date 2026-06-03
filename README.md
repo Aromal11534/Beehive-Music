@@ -7,7 +7,7 @@ A premium, production-grade Discord music bot system with a private web control 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        Nginx (Reverse Proxy)                │
-│                     beehive.syncify.in                       │
+│                     beehive.teamsyndicate.org                       │
 ├──────────────┬──────────────────┬───────────────────────────┤
 │  /api/*      │   /              │   WebSocket               │
 │  FastAPI     │   Next.js        │   Realtime                │
@@ -103,7 +103,7 @@ A premium, production-grade Discord music bot system with a private web control 
 
 6. **Access the web panel:**
    - Development: `http://localhost:3000`
-   - Production: `https://beehive.syncify.in`
+   - Production: `https://beehive.teamsyndicate.org`
 
 ## Development
 
@@ -127,7 +127,7 @@ See `.env.example` for all required environment variables.
 
 ## Domain
 
-This project is deployed at **beehive.syncify.in**.
+This project is deployed at **beehive.teamsyndicate.org**.
 
 ---
 

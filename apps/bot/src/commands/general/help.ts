@@ -38,10 +38,10 @@ export const help: BotCommand = {
         },
         {
           name: '🌐 Web Portal',
-          value: 'Full control panel at **beehive.syncify.in**',
+          value: 'Full control panel at **beehive.teamsyndicate.org**',
         },
       )
-      .setFooter({ text: 'Beehive Music Bot • beehive.syncify.in' });
+      .setFooter({ text: 'Beehive Music Bot • beehive.teamsyndicate.org' });
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
   },

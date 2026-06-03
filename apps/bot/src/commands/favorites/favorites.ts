@@ -36,7 +36,7 @@ export const favorites: BotCommand = {
         await interaction.reply({ embeds: [successEmbed('Visit the web portal to manage favorites')], ephemeral: true });
         break;
       case 'list':
-        await interaction.reply({ embeds: [successEmbed('Visit beehive.syncify.in to view your favorites')], ephemeral: true });
+        await interaction.reply({ embeds: [successEmbed('Visit beehive.teamsyndicate.org to view your favorites')], ephemeral: true });
         break;
     }
   },

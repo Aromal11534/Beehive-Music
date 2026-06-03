@@ -36,7 +36,7 @@ export const playlist: BotCommand = {
 
     switch (subcommand) {
       case 'create':
-        await interaction.reply({ embeds: [successEmbed(`Playlist creation — connect with the web portal at beehive.syncify.in for full playlist management`)], ephemeral: true });
+        await interaction.reply({ embeds: [successEmbed(`Playlist creation — connect with the web portal at beehive.teamsyndicate.org for full playlist management`)], ephemeral: true });
         break;
       case 'list':
         await interaction.reply({ embeds: [successEmbed('Visit the web portal for full playlist management')], ephemeral: true });

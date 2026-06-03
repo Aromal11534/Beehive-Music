@@ -28,7 +28,7 @@ export const serverPlayer: BotCommand = {
 
     if (subcommand === 'settings') {
       await interaction.reply({
-        embeds: [successEmbed('Server settings can be managed at **beehive.syncify.in** → Servers → Settings')],
+        embeds: [successEmbed('Server settings can be managed at **beehive.teamsyndicate.org** → Servers → Settings')],
         ephemeral: true,
       });
     } else if (subcommand === 'bind') {
