@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { api } from '@/lib/api';
+import { api, getApiBase } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import type { User } from '@/lib/types';
 import { Icon } from '@/components/icons';
@@ -76,12 +76,20 @@ export default function AdminPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/50">
-            {users.map((u) => (
+            {users.map((u) => {
+              const avatarFilename = u.avatar_path ? u.avatar_path.split(/[/\\]/).pop() : null;
+              const avatarUrl = avatarFilename ? `${getApiBase()}/avatars/${avatarFilename}` : null;
+
+              return (
               <tr key={u.id} className="hover:bg-zinc-800/30 transition">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-amber-400 text-sm font-bold">
-                      {u.display_name?.[0]?.toUpperCase()}
+                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-amber-400 text-sm font-bold overflow-hidden shrink-0">
+                      {avatarUrl ? (
+                        <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        u.display_name?.[0]?.toUpperCase()
+                      )}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-zinc-200">{u.display_name}</p>
@@ -105,7 +113,8 @@ export default function AdminPage() {
                   {u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

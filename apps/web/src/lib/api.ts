@@ -9,7 +9,7 @@ function normalizeApiBase(base: string) {
   return trimmed.endsWith('/api') ? `${trimmed}/v1` : trimmed;
 }
 
-function getApiBase() {
+export function getApiBase() {
   if (typeof window !== 'undefined') {
     const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const configuredHost = CONFIGURED_API_BASE.startsWith('http') ? new URL(CONFIGURED_API_BASE).hostname : window.location.hostname;

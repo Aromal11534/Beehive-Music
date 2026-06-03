@@ -5,7 +5,7 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -157,11 +157,25 @@ class AuthService:
         access_token = create_access_token(token_data)
         refresh_token = create_refresh_token(token_data)
 
+        parsed_user_agent = user_agent[:512] if user_agent else None
+
+        # Revoke existing active sessions from the same device (IP + User Agent) to prevent duplicates
+        await self.db.execute(
+            update(UserSession)
+            .where(
+                UserSession.user_id == user.id,
+                UserSession.ip_address == ip,
+                UserSession.user_agent == parsed_user_agent,
+                UserSession.revoked_at.is_(None)
+            )
+            .values(revoked_at=datetime.now(timezone.utc))
+        )
+
         session = UserSession(
             user_id=user.id,
             refresh_token_hash=hash_token(refresh_token),
             ip_address=ip,
-            user_agent=user_agent[:512] if user_agent else None,
+            user_agent=parsed_user_agent,
             expires_at=datetime.now(timezone.utc) + timedelta(days=7),
         )
         self.db.add(session)
@@ -211,3 +225,42 @@ class AuthService:
         session = result.scalar_one_or_none()
         if session:
             session.revoked_at = datetime.now(timezone.utc)
+
+    async def initiate_password_reset(self, email: str):
+        """Generate a password reset token for the given email.
+        
+        Always succeeds silently to prevent email enumeration.
+        In production, send the token via email. For now, log it.
+        """
+        result = await self.db.execute(
+            select(User).where(User.email == email)
+        )
+        user = result.scalar_one_or_none()
+        if not user:
+            # Don't reveal whether the email exists
+            return
+
+        reset_token = secrets.token_urlsafe(32)
+        await redis_client.setex(
+            f"password_reset:{reset_token}", 1800, str(user.id)  # 30 minutes
+        )
+        logger.info("Password reset token for user_id=%s: %s", user.id, reset_token)
+
+    async def reset_password_with_token(self, token: str, new_password: str):
+        """Reset password using a valid reset token."""
+        user_id = await redis_client.get(f"password_reset:{token}")
+        if not user_id:
+            raise AuthenticationError("Reset token is invalid or expired")
+
+        result = await self.db.execute(
+            select(User).where(User.id == int(user_id))
+        )
+        user = result.scalar_one_or_none()
+        if not user:
+            raise AuthenticationError("User not found")
+
+        from app.core.security import hash_password
+        user.password_hash = hash_password(new_password)
+        user.updated_at = datetime.now(timezone.utc)
+        await redis_client.delete(f"password_reset:{token}")
+

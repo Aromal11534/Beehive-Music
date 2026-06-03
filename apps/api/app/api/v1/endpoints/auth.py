@@ -1,4 +1,4 @@
-"""Authentication endpoints — login, MFA, refresh, logout."""
+"""Authentication endpoints — login, register, MFA, refresh, logout, forgot password."""
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,10 +9,12 @@ from app.api.v1.deps import get_current_user, get_client_ip
 from app.schemas.auth import (
     LoginRequest, LoginResponse, MfaVerifyRequest,
     TokenRefreshRequest, TokenRefreshResponse, PasswordChangeRequest,
+    RegisterRequest, ForgotPasswordRequest, ResetPasswordRequest,
 )
 from app.schemas.common import MessageResponse
 from app.services.auth_service import AuthService
 from app.services.user_service import UserService
+from app.schemas.user import UserCreate
 from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -31,6 +33,59 @@ async def login(
     ua = request.headers.get("user-agent")
     result = await service.login(body.username, body.password, ip, ua)
     return result
+
+
+@router.post("/register", response_model=LoginResponse)
+@limiter.limit("3/minute")
+async def register(
+    body: RegisterRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Register a new user account and auto-login."""
+    user_service = UserService(db)
+    user_data = UserCreate(
+        username=body.username,
+        display_name=body.display_name,
+        password=body.password,
+        email=body.email,
+        is_admin=False,
+    )
+    await user_service.create_user(user_data)
+    await db.commit()
+
+    # Auto-login the new user
+    auth_service = AuthService(db)
+    ip = get_client_ip(request)
+    ua = request.headers.get("user-agent")
+    result = await auth_service.login(body.username, body.password, ip, ua)
+    return result
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+@limiter.limit("3/minute")
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Request a password reset link. Always returns success to prevent email enumeration."""
+    auth_service = AuthService(db)
+    await auth_service.initiate_password_reset(body.email)
+    return {"message": "If an account with that email exists, a reset link has been sent."}
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+@limiter.limit("5/minute")
+async def reset_password(
+    body: ResetPasswordRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset password using a reset token."""
+    auth_service = AuthService(db)
+    await auth_service.reset_password_with_token(body.token, body.new_password)
+    return {"message": "Password has been reset successfully."}
 
 
 @router.post("/mfa/verify", response_model=LoginResponse)
@@ -95,3 +150,4 @@ async def change_password(
     service = UserService(db)
     await service.change_password(current_user.id, body.current_password, body.new_password)
     return {"message": "Password changed successfully"}
+

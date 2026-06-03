@@ -16,6 +16,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<{ mfa_required: boolean; mfa_token?: string }>;
+  register: (username: string, email: string, password: string, displayName: string) => Promise<void>;
   verifyMfa: (mfaToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -25,9 +26,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(() => (
-    typeof window !== 'undefined' && !!localStorage.getItem('beehive_access_token')
-  ));
+  const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -40,8 +39,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('beehive_access_token') : null;
-    if (!token) return;
+    const token = localStorage.getItem('beehive_access_token');
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
 
     let isMounted = true;
     async function loadUser() {
@@ -81,6 +83,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const register = async (username: string, email: string, password: string, displayName: string) => {
+    const data = await api.post<LoginResponse>('/auth/register', {
+      username,
+      email,
+      password,
+      display_name: displayName,
+    });
+    api.setTokens(data.access_token, data.refresh_token);
+    await refreshUser();
+  };
+
   const verifyMfa = async (mfaToken: string, code: string) => {
     const data = await api.post<LoginResponse>('/auth/mfa/verify', { mfa_token: mfaToken, code });
     api.setTokens(data.access_token, data.refresh_token);
@@ -104,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       isAuthenticated: !!user,
       login,
+      register,
       verifyMfa,
       logout,
       refreshUser,
@@ -118,3 +132,4 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
+

@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BrandMark, Icon, type IconName } from '@/components/icons';
+import { getApiBase } from '@/lib/api';
 import { TopSearchBar } from '@/components/TopSearchBar';
 import { GuildProvider } from '@/context/GuildContext';
 
@@ -51,6 +52,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!isAuthenticated) return null;
 
   const allNav = [...navigation, ...(user?.is_admin ? adminNav : [])];
+  const avatarFilename = user?.avatar_path ? user.avatar_path.split(/[/\\]/).pop() : null;
+  const avatarUrl = avatarFilename ? `${getApiBase()}/avatars/${avatarFilename}` : null;
 
   return (
     <GuildProvider>
@@ -90,8 +93,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* User info */}
           <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-zinc-800/50">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-amber-400 font-bold">
-                {user?.display_name?.[0]?.toUpperCase() || '?'}
+              <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-amber-400 font-bold overflow-hidden shrink-0">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  user?.display_name?.[0]?.toUpperCase() || '?'
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-zinc-200 truncate">{user?.display_name}</p>
