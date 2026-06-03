@@ -66,6 +66,15 @@ class Settings(BaseSettings):
     api_base_url: str = Field(default="http://localhost:8001", alias="API_BASE_URL")
     internal_api_token: str | None = Field(default=None, alias="INTERNAL_API_TOKEN")
 
+    # ── SMTP / Email ─────────────────────────────────────
+    smtp_host: str | None = Field(default=None, alias="SMTP_HOST")
+    smtp_port: int | None = Field(default=587, alias="SMTP_PORT")
+    smtp_user: str | None = Field(default=None, alias="SMTP_USER")
+    smtp_password: str | None = Field(default=None, alias="SMTP_PASSWORD")
+    smtp_from_email: str | None = Field(default="noreply@example.com", alias="SMTP_FROM_EMAIL")
+    smtp_from_name: str | None = Field(default="Beehive", alias="SMTP_FROM_NAME")
+    frontend_url: str = Field(default="http://localhost:3000", alias="FRONTEND_URL")
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

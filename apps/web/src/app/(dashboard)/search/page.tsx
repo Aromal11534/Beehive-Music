@@ -92,7 +92,7 @@ export default function SearchPage() {
   return (
     <div className="space-y-6 animate-slide-up">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-zinc-100">Search Music</h1>
+        <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">Search Music</h1>
         <select
           value={selectedGuild}
           onChange={(e) => setSelectedGuild(e.target.value)}

@@ -222,8 +222,8 @@ export default function NowPlayingPage() {
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-400">Now Playing</p>
-                      <p className="truncate text-sm font-bold text-white">{track ? currentTitle : 'Nothing playing'}</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400">Now Playing</p>
+                      <p className="truncate text-sm font-semibold text-white">{track ? currentTitle : 'Nothing playing'}</p>
                       <p className="truncate text-xs text-zinc-400">{track ? currentAuthor : 'Start playback from Discord or Search'}</p>
                     </div>
                   </div>
@@ -235,7 +235,7 @@ export default function NowPlayingPage() {
               <section>
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-xl font-black tracking-tight">Live queue</h2>
-                  <span className="text-xs font-bold uppercase tracking-wide text-zinc-400">{queue.length} upcoming</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{queue.length} upcoming</span>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {(featuredTracks.length ? featuredTracks : [null, null, null]).map((item, index) => (
@@ -248,7 +248,7 @@ export default function NowPlayingPage() {
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-white">{item ? getTrackTitle(item) : 'Queue slot'}</p>
+                        <p className="truncate text-sm font-semibold text-white">{item ? getTrackTitle(item) : 'Queue slot'}</p>
                         <p className="truncate text-xs text-zinc-400">{item ? getTrackAuthor(item) : 'Waiting for tracks'}</p>
                       </div>
                       {index === 0 && track ? <span className="mr-2 h-4 w-1 rounded bg-emerald-400" /> : null}
@@ -260,7 +260,7 @@ export default function NowPlayingPage() {
               <section>
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-xl font-black tracking-tight">Made for this session</h2>
-                  <span className="text-xs font-bold uppercase tracking-wide text-zinc-400">Show all</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Show all</span>
                 </div>
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
                   {featuredTracks.slice(0, 5).map((item, index) => (
@@ -272,7 +272,7 @@ export default function NowPlayingPage() {
                           <div className="flex h-full w-full items-center justify-center text-amber-300"><Icon name="disc" className="h-8 w-8" /></div>
                         )}
                       </div>
-                      <p className="mt-3 truncate text-sm font-bold text-white">{index === 0 ? 'Current Mix' : `Daily Mix ${index}`}</p>
+                      <p className="mt-3 truncate text-sm font-semibold text-white">{index === 0 ? 'Current Mix' : `Daily Mix ${index}`}</p>
                       <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-400">{getTrackTitle(item)} by {getTrackAuthor(item)}</p>
                     </div>
                   ))}
@@ -291,7 +291,7 @@ export default function NowPlayingPage() {
           <aside className="hidden min-h-0 w-[320px] shrink-0 overflow-y-auto rounded-[22px] bg-[#181818] p-4 ring-1 ring-white/5 lg:block">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-black">{track ? 'Now Playing' : 'Player'}</h2>
-              <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-zinc-300">Live</span>
+              <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-300">Live</span>
             </div>
 
             <div className="relative aspect-square overflow-hidden rounded-xl bg-zinc-900 shadow-2xl">
@@ -323,10 +323,10 @@ export default function NowPlayingPage() {
                 <p className="text-sm font-black">About the artist</p>
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-bold text-white">{currentAuthor}</p>
+                    <p className="font-semibold text-white">{currentAuthor}</p>
                     <p className="text-xs text-zinc-400">Live from {selectedGuildName}</p>
                   </div>
-                  <button className="rounded-full border border-white/40 px-3 py-1 text-xs font-bold transition hover:scale-105 hover:border-white">Follow</button>
+                  <button className="rounded-full border border-white/40 px-3 py-1 text-xs font-semibold transition hover:scale-105 hover:border-white">Follow</button>
                 </div>
                 <p className="mt-3 line-clamp-4 text-xs leading-5 text-zinc-300">Playback is synced from your Discord server through Beehive. Manage the queue, save favorites, and jump through the track without leaving this room.</p>
               </div>
@@ -362,7 +362,7 @@ export default function NowPlayingPage() {
                     <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
                       <Icon name="disc" className="w-6 h-6 text-zinc-500" />
                     </div>
-                    <p className="text-zinc-300 font-bold">No playlists found</p>
+                    <p className="text-zinc-300 font-semibold">No playlists found</p>
                     <p className="text-xs text-zinc-500 mt-1">Create one in the Playlists tab</p>
                   </div>
                 ) : (
@@ -377,7 +377,7 @@ export default function NowPlayingPage() {
                           <Icon name="disc" className="w-5 h-5" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-zinc-200 group-hover:text-white transition truncate">{playlist.name}</p>
+                          <p className="font-semibold text-zinc-200 group-hover:text-white transition truncate">{playlist.name}</p>
                           <p className="text-xs text-zinc-500 uppercase tracking-wider mt-0.5">{playlist.track_count || 0} tracks</p>
                         </div>
                         <Icon name="plus" className="w-4 h-4 text-zinc-600 group-hover:text-amber-400 transition shrink-0" />
@@ -392,7 +392,7 @@ export default function NowPlayingPage() {
 
         <footer className="relative z-20 shrink-0 border-t border-white/10 bg-black/95 px-4 py-3 backdrop-blur-xl">
           {actionFeedback && (
-            <div className="absolute -top-12 right-5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-bold text-emerald-300 shadow-xl">
+            <div className="absolute -top-12 right-5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-300 shadow-xl">
               {actionFeedback}
             </div>
           )}
@@ -407,7 +407,7 @@ export default function NowPlayingPage() {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-white">{track ? currentTitle : 'Nothing playing'}</p>
+                <p className="truncate text-sm font-semibold text-white">{track ? currentTitle : 'Nothing playing'}</p>
                 <p className="truncate text-xs text-zinc-400">{track ? currentAuthor : selectedGuildName}</p>
               </div>
             </div>
@@ -476,7 +476,7 @@ export default function NowPlayingPage() {
                 style={{ backgroundSize: `${Math.min(((state?.volume ?? 80) / 200) * 100, 100)}% 4px, 100% 4px` }}
                 className="spotify-volume h-4 w-28 cursor-pointer appearance-none bg-transparent"
               />
-              <span className="w-9 text-right text-xs font-bold text-zinc-400">{state?.volume ?? 80}%</span>
+              <span className="w-9 text-right text-xs font-semibold text-zinc-400">{state?.volume ?? 80}%</span>
             </div>
           </div>
         </footer>

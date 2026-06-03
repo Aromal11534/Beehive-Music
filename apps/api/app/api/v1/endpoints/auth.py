@@ -59,6 +59,16 @@ async def register(
     ip = get_client_ip(request)
     ua = request.headers.get("user-agent")
     result = await auth_service.login(body.username, body.password, ip, ua)
+
+    # Send welcome email
+    if body.email:
+        try:
+            from app.services.email_service import EmailService
+            EmailService().send_welcome_email(body.email, body.display_name or body.username)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error sending welcome email: {e}")
+
     return result
 
 

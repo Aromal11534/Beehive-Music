@@ -102,7 +102,7 @@ export default function FavoritesPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0 pr-4">
-                          <p className="text-sm font-bold text-white truncate group-hover:text-amber-400 transition">{t.track_title}</p>
+                          <p className="text-sm font-semibold text-white truncate group-hover:text-amber-400 transition">{t.track_title}</p>
                           <p className="text-xs text-zinc-400 truncate mt-0.5">{t.track_author || 'Unknown Artist'}</p>
                         </div>
                         

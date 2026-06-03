@@ -121,26 +121,41 @@ export default function LoginPage() {
     'w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition';
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-950 relative overflow-hidden">
-      {/* Background effects */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-amber-600/5 rounded-full blur-3xl"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(245,158,11,0.05)_0%,_transparent_70%)]"></div>
+    <div className="min-h-screen grid lg:grid-cols-2 bg-zinc-950 relative overflow-hidden">
+      {/* Left Column: Branding */}
+      <div className="relative hidden lg:flex flex-col items-center justify-center p-12 overflow-hidden bg-zinc-950">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-zinc-950 to-zinc-950"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.15),_transparent_40%),radial-gradient(circle_at_bottom_right,_rgba(245,158,11,0.05),_transparent_40%)]"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        {/* Right edge dissolve gradient */}
+        <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-zinc-950 to-transparent z-20 pointer-events-none"></div>
+        
+        <div className="relative z-10 flex flex-col items-center text-center max-w-lg animate-fade-in pr-12">
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-[2rem] bg-gradient-to-br from-amber-400 to-amber-600 mb-8 shadow-2xl shadow-amber-500/30">
+            <BrandMark className="h-12 w-12 text-zinc-950" />
+          </div>
+          <h1 className="text-5xl font-semibold text-white tracking-tight mb-4">Beehive Music</h1>
+          <p className="text-lg text-zinc-400 leading-relaxed font-medium">
+            The ultimate music control panel for your Discord servers. Sync, play, and manage queues beautifully.
+          </p>
+        </div>
       </div>
 
-      <div className="relative z-10 w-full max-w-md px-4 animate-fade-in">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 mb-4 animate-pulse-glow">
-            <BrandMark className="h-11 w-11 text-zinc-950" />
+      {/* Right Column: Auth */}
+      <div className="relative flex items-center justify-center p-6 sm:p-12 animate-fade-in bg-zinc-950 z-10">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(245,158,11,0.03)_0%,_transparent_70%)] lg:hidden"></div>
+        
+        <div className="relative w-full max-w-md lg:-ml-12">
+          {/* Mobile Logo */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 mb-4 shadow-xl shadow-amber-500/20">
+              <BrandMark className="h-8 w-8 text-zinc-950" />
+            </div>
+            <h1 className="text-3xl font-semibold text-white">Beehive Music</h1>
           </div>
-          <h1 className="text-3xl font-bold text-zinc-100">Beehive</h1>
-          <p className="text-zinc-500 mt-1">Discord Music Control Panel</p>
-        </div>
 
-        {/* Auth Card */}
-        <div className="glass-card p-8">
+          {/* Auth Card */}
+          <div className="glass-card p-8 shadow-2xl ring-1 ring-white/5 bg-zinc-900/80 backdrop-blur-xl">
           {view === 'mfa' ? (
             /* ── MFA View ── */
             <form onSubmit={handleMfaVerify} className="space-y-5">
@@ -513,11 +528,12 @@ export default function LoginPage() {
               </div>
             </div>
           )}
-        </div>
+          </div>
 
-        <p className="text-center text-zinc-600 text-xs mt-6">
-          Beehive | beehive.syncify.in
-        </p>
+          <p className="text-center text-zinc-600 text-xs mt-8 font-medium">
+            Beehive | beehive.syncify.in
+          </p>
+        </div>
       </div>
     </div>
   );

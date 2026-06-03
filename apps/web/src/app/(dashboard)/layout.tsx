@@ -65,7 +65,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
               <BrandMark className="h-5 w-5 text-zinc-950" />
             </div>
-            <span className="text-lg font-bold text-zinc-100">Beehive</span>
+            <span className="text-lg font-semibold text-zinc-100">Beehive Music</span>
           </div>
 
           {/* Nav items */}
@@ -93,7 +93,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* User info */}
           <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-zinc-800/50">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-amber-400 font-bold overflow-hidden shrink-0">
+              <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-amber-400 font-semibold overflow-hidden shrink-0">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (

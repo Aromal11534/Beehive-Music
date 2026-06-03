@@ -55,7 +55,7 @@ export default function ServersPage() {
     <div className="space-y-6 animate-slide-up">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Servers</h1>
+          <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">Servers</h1>
           <p className="text-sm text-zinc-500 mt-1">Connect Beehive to Discord servers where you have permission to add apps.</p>
         </div>
         <div className="flex items-center gap-3">

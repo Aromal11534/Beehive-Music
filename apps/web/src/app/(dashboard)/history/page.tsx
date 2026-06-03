@@ -14,7 +14,7 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-6 animate-slide-up">
-      <h1 className="text-2xl font-bold text-zinc-100">Play History</h1>
+      <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">Play History</h1>
 
       {history.length > 0 ? (
         <div className="space-y-2">

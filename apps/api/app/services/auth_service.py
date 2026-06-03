@@ -246,6 +246,12 @@ class AuthService:
         )
         logger.info("Password reset token for user_id=%s: %s", user.id, reset_token)
 
+        try:
+            from app.services.email_service import EmailService
+            EmailService().send_password_reset_email(email, reset_token)
+        except Exception as e:
+            logger.error(f"Error sending password reset email: {e}")
+
     async def reset_password_with_token(self, token: str, new_password: str):
         """Reset password using a valid reset token."""
         user_id = await redis_client.get(f"password_reset:{token}")

@@ -45,7 +45,7 @@ export default function AdminPage() {
   return (
     <div className="space-y-6 animate-slide-up">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-zinc-100">Admin Panel</h1>
+        <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">Admin Panel</h1>
         <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/15 text-amber-400 rounded-lg text-sm font-medium">
           <Icon name="shield" className="h-4 w-4" /> Admin
         </span>
@@ -84,7 +84,7 @@ export default function AdminPage() {
               <tr key={u.id} className="hover:bg-zinc-800/30 transition">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-amber-400 text-sm font-bold overflow-hidden shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-amber-400 text-sm font-semibold overflow-hidden shrink-0">
                       {avatarUrl ? (
                         <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                       ) : (

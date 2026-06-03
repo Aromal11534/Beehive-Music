@@ -204,7 +204,7 @@ export default function SettingsPage() {
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_10%,_rgba(251,191,36,0.16),_transparent_28%)] pointer-events-none" />
             <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.22em] text-amber-300/80">Account Control</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-amber-300/80">Account Control</p>
                 <h1 className="mt-2 text-4xl font-black tracking-tight md:text-5xl">Settings</h1>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-300">Manage your Beehive identity, security controls, active sessions, and default music preferences.</p>
               </div>
@@ -215,7 +215,7 @@ export default function SettingsPage() {
             <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
               <aside className="h-fit rounded-3xl bg-white/[0.04] p-3 ring-1 ring-white/10 backdrop-blur xl:sticky xl:top-0">
                 <div className="px-3 py-3">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Sections</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Sections</p>
                 </div>
                 <div className="space-y-1">
                   {tabs.map((item) => {
@@ -244,7 +244,7 @@ export default function SettingsPage() {
               <main className="min-w-0 space-y-5">
                 {message ? (
                   <div className="flex justify-end">
-                    <div className="shrink-0 rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-sm font-bold text-amber-300">
+                    <div className="shrink-0 rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-300">
                       {message}
                     </div>
                   </div>
@@ -287,7 +287,7 @@ export default function SettingsPage() {
                         <h3 className="text-lg font-black">{user?.display_name || 'Beehive User'}</h3>
                         <p className="text-sm text-zinc-500">@{user?.username}</p>
                       </div>
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-zinc-200 transition hover:bg-white/15">
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-zinc-200 transition hover:bg-white/15">
                         <Icon name="plus" className="h-4 w-4" />
                         Upload Avatar
                         <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
@@ -338,7 +338,7 @@ export default function SettingsPage() {
                         {sessions.length > 0 ? sessions.map((session) => (
                           <div key={session.id} className="flex flex-col gap-3 rounded-2xl bg-black/30 p-4 ring-1 ring-white/5 sm:flex-row sm:items-center sm:justify-between">
                             <div className="min-w-0">
-                              <p className="text-sm font-bold text-zinc-200">{session.ip_address || 'Unknown IP'}</p>
+                              <p className="text-sm font-semibold text-zinc-200">{session.ip_address || 'Unknown IP'}</p>
                               <p className="mt-1 truncate text-xs text-zinc-500">{session.user_agent || 'Unknown device'}</p>
                             </div>
                             <button onClick={() => revokeSession(session.id)} className="shrink-0 self-start rounded-full bg-red-500/10 px-3 py-1.5 text-xs font-black text-red-300 transition hover:bg-red-500/20 sm:self-auto">
@@ -413,7 +413,7 @@ export default function SettingsPage() {
 
               {mfaModalMode === 'setup' && mfaRecoveryCodes && (
                 <div className="space-y-4">
-                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-400 text-sm font-bold text-center">
+                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-400 text-sm font-semibold text-center">
                     Authenticator app configured successfully.
                   </div>
                   <p className="text-sm text-zinc-400">Please save these recovery codes in a secure place. If you lose your device, you will need them to access your account.</p>

@@ -71,7 +71,7 @@ export default function DashboardPage() {
                         <Icon name={stat.icon} className="h-5 w-5 text-white" />
                       </div>
                       <p className="text-3xl font-black text-white">{stat.value}</p>
-                      <p className="text-xs font-bold uppercase tracking-wider text-zinc-400 mt-1">{stat.label}</p>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mt-1">{stat.label}</p>
                     </div>
                   ))}
                 </div>
@@ -84,7 +84,7 @@ export default function DashboardPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-black tracking-tight">Recent Activity</h2>
-                    <span className="text-xs font-bold uppercase tracking-wide text-zinc-400">Past 5 tracks</span>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Past 5 tracks</span>
                   </div>
                   
                   {stats?.recent_tracks && stats.recent_tracks.length > 0 ? (
@@ -95,7 +95,7 @@ export default function DashboardPage() {
                             <Icon name="music" className="h-5 w-5" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-bold text-white">{track.track_title}</p>
+                            <p className="truncate text-sm font-semibold text-white">{track.track_title}</p>
                             <p className="truncate text-xs text-zinc-400">{track.track_author || 'Unknown Artist'}</p>
                           </div>
                           <span className="text-xs font-medium text-zinc-500 whitespace-nowrap">
@@ -109,7 +109,7 @@ export default function DashboardPage() {
                       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-black/40 text-zinc-500">
                         <Icon name="headphones" className="h-6 w-6" />
                       </div>
-                      <p className="text-sm font-bold text-zinc-300">No recent activity</p>
+                      <p className="text-sm font-semibold text-zinc-300">No recent activity</p>
                       <p className="text-xs text-zinc-500 mt-1">Start playing music to see history</p>
                     </div>
                   )}
@@ -135,7 +135,7 @@ export default function DashboardPage() {
                         <div className="w-10 h-10 rounded-full bg-black/40 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-amber-500/20 transition-transform">
                           <Icon name={action.icon} className="h-5 w-5 text-amber-400" />
                         </div>
-                        <span className="text-sm font-bold text-white">{action.label}</span>
+                        <span className="text-sm font-semibold text-white">{action.label}</span>
                         <span className="text-xs text-zinc-400 mt-0.5">{action.desc}</span>
                       </a>
                     ))}

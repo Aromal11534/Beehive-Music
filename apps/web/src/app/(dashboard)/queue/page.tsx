@@ -103,7 +103,7 @@ function SortableQueueItem({
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <h3 className="font-bold text-zinc-200 text-sm truncate">{getTitle(item)}</h3>
+        <h3 className="font-semibold text-zinc-200 text-sm truncate">{getTitle(item)}</h3>
         <p className="text-xs text-zinc-400 truncate">{getAuthor(item)}</p>
       </div>
       <div className="flex items-center gap-1 md:gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
@@ -242,12 +242,12 @@ export default function QueuePage() {
   return (
     <div className="space-y-6 animate-slide-up relative pb-20">
       {actionFeedback && (
-        <div className="fixed top-8 right-8 z-50 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-bold text-emerald-300 shadow-xl animate-fade-in">
+        <div className="fixed top-8 right-8 z-50 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-300 shadow-xl animate-fade-in">
           {actionFeedback}
         </div>
       )}
 
-      <h1 className="text-2xl font-bold text-zinc-100">Queue</h1>
+      <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">Queue</h1>
       
       {!track && optimisticQueue.length === 0 ? (
         <div className="glass-card p-16 text-center">
@@ -261,7 +261,7 @@ export default function QueuePage() {
         <div className="space-y-4">
           {track && (
             <div className="glass-card p-4 ring-1 ring-amber-500/20 bg-amber-500/5 relative group">
-              <p className="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2">Now Playing</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400 mb-2">Now Playing</p>
               <div className="flex items-center gap-4">
                 <div className="relative h-14 w-14 overflow-hidden rounded bg-zinc-800 shrink-0">
                   {track.artwork_url ? (
@@ -271,7 +271,7 @@ export default function QueuePage() {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-bold text-zinc-100">{getTitle(track)}</h3>
+                  <h3 className="font-semibold text-zinc-100">{getTitle(track)}</h3>
                   <p className="text-sm text-zinc-400">{getAuthor(track)}</p>
                 </div>
                 <div className="flex items-center gap-1 md:gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -288,7 +288,7 @@ export default function QueuePage() {
 
           {optimisticQueue.length > 0 && (
             <div className="glass-card p-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-4">{optimisticQueue.length} Tracks in Queue</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-4">{optimisticQueue.length} Tracks in Queue</p>
               
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={optimisticQueue.map((_, i) => `track-${i}`)} strategy={verticalListSortingStrategy}>
@@ -333,7 +333,7 @@ export default function QueuePage() {
                   <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
                     <Icon name="disc" className="w-6 h-6 text-zinc-500" />
                   </div>
-                  <p className="text-zinc-300 font-bold">No playlists found</p>
+                  <p className="text-zinc-300 font-semibold">No playlists found</p>
                   <p className="text-xs text-zinc-500 mt-1">Create one in the Playlists tab</p>
                 </div>
               ) : (
@@ -348,7 +348,7 @@ export default function QueuePage() {
                         <Icon name="disc" className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-zinc-200 group-hover:text-white transition truncate">{playlist.name}</p>
+                        <p className="font-semibold text-zinc-200 group-hover:text-white transition truncate">{playlist.name}</p>
                         <p className="text-xs text-zinc-500 uppercase tracking-wider mt-0.5">{playlist.track_count || 0} tracks</p>
                       </div>
                       <Icon name="plus" className="w-4 h-4 text-zinc-600 group-hover:text-amber-400 transition shrink-0" />

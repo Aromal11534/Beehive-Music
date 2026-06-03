@@ -92,7 +92,7 @@ export default function PlaylistsPage() {
                 <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-4">
                   <div>
                     {selectedPlaylist ? (
-                      <button onClick={() => setSelectedPlaylist(null)} className="mb-2 text-emerald-400 hover:text-emerald-300 flex items-center gap-2 text-sm font-bold transition">
+                      <button onClick={() => setSelectedPlaylist(null)} className="mb-2 text-emerald-400 hover:text-emerald-300 flex items-center gap-2 text-sm font-semibold transition">
                         <Icon name="arrow-left" className="w-4 h-4" /> Back to Playlists
                       </button>
                     ) : (
@@ -110,7 +110,7 @@ export default function PlaylistsPage() {
                   {!selectedPlaylist && (
                     <button
                       onClick={() => setShowCreate(!showCreate)}
-                      className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-emerald-950 font-bold rounded-xl text-sm hover:from-emerald-400 hover:to-emerald-500 transition shadow-lg shrink-0"
+                      className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-emerald-950 font-semibold rounded-xl text-sm hover:from-emerald-400 hover:to-emerald-500 transition shadow-lg shrink-0"
                     >
                       + Create Playlist
                     </button>
@@ -134,7 +134,7 @@ export default function PlaylistsPage() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0 pr-4">
-                            <p className="text-sm font-bold text-white truncate group-hover:text-emerald-400 transition">{t.track_title}</p>
+                            <p className="text-sm font-semibold text-white truncate group-hover:text-emerald-400 transition">{t.track_title}</p>
                             <p className="text-xs text-zinc-400 truncate mt-0.5">{t.track_author || 'Unknown Artist'}</p>
                           </div>
                           
@@ -173,7 +173,7 @@ export default function PlaylistsPage() {
                           className="flex-1 px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                           autoFocus
                         />
-                        <button onClick={createPlaylist} className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 transition text-emerald-950 rounded-xl font-bold">
+                        <button onClick={createPlaylist} className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 transition text-emerald-950 rounded-xl font-semibold">
                           Save
                         </button>
                       </div>
@@ -186,7 +186,7 @@ export default function PlaylistsPage() {
                             <div className="w-14 h-14 rounded-xl bg-black/40 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-emerald-500/20 transition-all text-emerald-400">
                               <Icon name="disc" className="h-7 w-7" />
                             </div>
-                            <h3 className="font-bold text-lg text-white truncate">{p.name}</h3>
+                            <h3 className="font-semibold text-lg text-white truncate">{p.name}</h3>
                             <p className="text-sm font-medium text-zinc-400 mt-1 uppercase tracking-wider text-xs">
                               {p.track_count || 0} tracks • {p.playlist_type}
                             </p>
