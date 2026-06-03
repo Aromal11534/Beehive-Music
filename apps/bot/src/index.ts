@@ -4,7 +4,7 @@
 
 import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
 import { config } from './config';
-import { BotCommand } from './types';
+import { BotCommand, QueueTrack } from './types';
 import { MusicManager } from './music/MusicManager';
 import { RedisService } from './services/RedisService';
 import { GuildSyncService } from './services/GuildSyncService';
@@ -205,7 +205,7 @@ async function main() {
       const readyKey = `search_ready:${request_id}`;
       console.log(`[Search] Searching for: ${query}`);
 
-      const result = await musicManager.search(query);
+      const result = await musicManager.search(query, query.startsWith('http') ? 'ytsearch' : 'ytmsearch');
       console.log(`[Search] Lavalink result loadType:`, result?.loadType);
       
       interface SearchTrackResult {
@@ -233,7 +233,7 @@ async function main() {
           trackList = [rawData as Record<string, unknown>];
         }
 
-        for (const t of trackList.slice(0, 10)) {
+        for (const t of trackList.slice(0, 25)) {
           const info = t['info'] as Record<string, unknown> | undefined;
           if (info && typeof info['title'] === 'string') {
             tracks.push({
@@ -272,15 +272,17 @@ async function main() {
 
       const queue = musicManager.getQueue(guild_id);
 
-      const queueTrack = {
-        encoded: track.encoded,
-        title: track.title,
-        author: track.author,
-        url: track.url || track.identifier,
-        identifier: track.identifier,
-        duration: track.duration,
-        artworkUrl: track.artwork_url || track.artworkUrl,
-        source: track.source,
+      const playableTrack = track;
+
+      const queueTrack: QueueTrack = {
+        encoded: playableTrack.encoded,
+        title: playableTrack.title,
+        author: playableTrack.author,
+        url: playableTrack.url || playableTrack.identifier,
+        identifier: playableTrack.identifier,
+        duration: playableTrack.duration,
+        artworkUrl: playableTrack.artwork_url || playableTrack.artworkUrl,
+        source: playableTrack.source,
         requestedBy: 'Web Panel',
         requestedById: user_discord_id,
       };

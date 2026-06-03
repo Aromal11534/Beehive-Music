@@ -183,7 +183,7 @@ export class MusicManager {
     return player;
   }
 
-  async search(query: string, source: string = 'ytsearch'): Promise<LavalinkResponse | undefined> {
+  async search(query: string, source: string = 'ytmsearch'): Promise<LavalinkResponse | undefined> {
     await this.connectLavalink();
 
     const node = this.shoukaku.options.nodeResolver(this.shoukaku.nodes);

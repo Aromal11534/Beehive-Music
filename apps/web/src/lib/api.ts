@@ -10,15 +10,6 @@ function normalizeApiBase(base: string) {
 }
 
 export function getApiBase() {
-  if (typeof window !== 'undefined') {
-    const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const configuredHost = CONFIGURED_API_BASE.startsWith('http') ? new URL(CONFIGURED_API_BASE).hostname : window.location.hostname;
-
-    if (isLocalHost || configuredHost !== window.location.hostname) {
-      return window.location.port === '3000' ? `http://${window.location.hostname}:8001/api/v1` : '/api/v1';
-    }
-  }
-
   return normalizeApiBase(CONFIGURED_API_BASE);
 }
 

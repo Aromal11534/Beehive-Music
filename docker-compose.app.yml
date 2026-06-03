@@ -1,0 +1,130 @@
+services:
+  yt-cipher:
+    image: ghcr.io/kikkia/yt-cipher:master
+    container_name: beehive-yt-cipher
+    restart: unless-stopped
+    networks:
+      - baota_net
+    environment:
+      - API_TOKEN=${YT_CIPHER_API_TOKEN}
+      - OVERRIDE_PLAYER_VARIANT=IAS
+
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4-alpine
+    container_name: beehive-lavalink
+    restart: unless-stopped
+    networks:
+      - baota_net
+    env_file:
+      - ${BEEHIVE_ENV_FILE:-.env.server}
+    environment:
+      - _JAVA_OPTIONS=-Xmx2G
+      - SERVER_PORT=${LAVALINK_PORT:-2333}
+      - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD}
+    ports:
+      - "2333:2333"
+    volumes:
+      - ./infra/lavalink/application.yml:/opt/Lavalink/application.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --header=\"Authorization: $${LAVALINK_SERVER_PASSWORD}\" -qO- http://127.0.0.1:$${SERVER_PORT}/version || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      - yt-cipher
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: beehive-api
+    restart: unless-stopped
+    networks:
+      - baota_net
+    env_file:
+      - ${BEEHIVE_ENV_FILE:-.env.server}
+    environment:
+      - FASTAPI_ENV=${FASTAPI_ENV:-production}
+      - API_HOST=0.0.0.0
+      - API_PORT=${API_PORT:-8001}
+      - POSTGRES_HOST=${POSTGRES_HOST:-127.0.0.1}
+      - POSTGRES_PORT=${POSTGRES_PORT:-35432}
+      - REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6379/0}
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./storage:/app/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:$${API_PORT}/api/v1/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  bot:
+    build:
+      context: ./apps/bot
+      dockerfile: Dockerfile
+    container_name: beehive-bot
+    restart: unless-stopped
+    networks:
+      - baota_net
+    env_file:
+      - ${BEEHIVE_ENV_FILE:-.env.server}
+    environment:
+      - LAVALINK_HOST=${LAVALINK_HOST:-127.0.0.1}
+      - LAVALINK_PORT=${LAVALINK_PORT:-2333}
+      - REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6379/0}
+      - API_BASE_URL=${API_BASE_URL:-http://127.0.0.1:8001}
+    depends_on:
+      lavalink:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api/v1}
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-/api/v1}
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-Beehive}
+        NEXT_PUBLIC_DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+    container_name: beehive-web
+    restart: unless-stopped
+    networks:
+      - baota_net
+    env_file:
+      - ${BEEHIVE_ENV_FILE:-.env.server}
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-/api/v1}
+      - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-/api/v1}
+      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Beehive}
+      - NEXT_PUBLIC_DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+    depends_on:
+      api:
+        condition: service_healthy
+
+  admin:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: beehive-admin
+    networks:
+      - baota_net
+    profiles:
+      - tools
+    env_file:
+      - ${BEEHIVE_ENV_FILE:-.env.server}
+    working_dir: /workspace
+    volumes:
+      - .:/workspace:ro
+    stdin_open: true
+    tty: true
+    command: sh -lc "pip install --no-cache-dir -r scripts/requirements.txt && python scripts/interactive_admin.py"
+
+networks:
+  baota_net:
+    external: true

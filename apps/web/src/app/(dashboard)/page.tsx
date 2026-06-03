@@ -15,18 +15,21 @@ function normalizeWsBase(base: string) {
 }
 
 function getWsBase() {
-  if (typeof window === 'undefined') return normalizeWsBase(CONFIGURED_WS_URL);
+  const normalized = normalizeWsBase(CONFIGURED_WS_URL);
 
-  const configuredHost = CONFIGURED_WS_URL.startsWith('ws') ? new URL(CONFIGURED_WS_URL).hostname : window.location.hostname;
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  if (typeof window === 'undefined') return normalized;
 
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || configuredHost !== window.location.hostname) {
-    return window.location.port === '3000'
-      ? `ws://${window.location.hostname}:8001/api/v1`
-      : `${wsProtocol}://${window.location.host}/api/v1`;
+  if (normalized.startsWith('ws://') || normalized.startsWith('wss://')) {
+    return normalized;
   }
 
-  return normalizeWsBase(CONFIGURED_WS_URL);
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    return normalized.replace(/^http/, 'ws');
+  }
+
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const path = normalized.startsWith('/') ? normalized : `/${normalized}`;
+  return `${wsProtocol}://${window.location.host}${path}`;
 }
 
 function getTrackTitle(track: PlayerTrack | null | undefined) {
