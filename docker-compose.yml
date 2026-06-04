@@ -10,27 +10,6 @@ services:
       - API_TOKEN=${YT_CIPHER_API_TOKEN:-local_dev_token}
       - OVERRIDE_PLAYER_VARIANT=IAS
 
-  # ── PostgreSQL ─────────────────────────────────────────
-  postgres:
-    image: postgres:16-alpine
-    container_name: beehive-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-beehive}
-      POSTGRES_USER: ${POSTGRES_USER:-beehive}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beehive_dev_password}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - beehive
-
   # ── Redis ──────────────────────────────────────────────
   redis:
     image: redis:7-alpine
@@ -84,8 +63,8 @@ services:
       - FASTAPI_ENV=${FASTAPI_ENV:-development}
       - API_HOST=0.0.0.0
       - API_PORT=8001
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_USER=${POSTGRES_USER:-beehive}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-beehive_dev_password}
       - POSTGRES_DB=${POSTGRES_DB:-beehive}
@@ -95,8 +74,6 @@ services:
       - ./apps/api:/app
       - ./storage:/app/storage
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -116,8 +93,6 @@ services:
     restart: unless-stopped
     env_file: .env
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       api:
@@ -181,7 +156,6 @@ services:
       - beehive
 
 volumes:
-  postgres_data:
   redis_data:
   letsencrypt_data:
   certbot_webroot:
