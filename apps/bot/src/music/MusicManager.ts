@@ -23,11 +23,11 @@ export class MusicManager {
     this.redis = redis;
 
     this.nodes = [
+      { name: 'local', url: `${config.lavalink.host}:${config.lavalink.port}`, auth: config.lavalink.password, secure: false, group: 'primary' },
       { name: 'serenetia', url: 'lavalinkv4.serenetia.com:443', auth: 'https://seretia.link/discord', secure: true, group: 'public' },
       { name: 'jirayu', url: 'lavalink.jirayu.net:443', auth: 'youshallnotpass', secure: true, group: 'public' },
       { name: 'millohost', url: 'lava-v4.millohost.my.id:443', auth: 'https://discord.gg/mjS5J2K3ep', secure: true, group: 'public' },
-      { name: 'triniumhost', url: 'lavalink-v4.triniumhost.com:443', auth: 'free', secure: true, group: 'public' },
-      { name: 'local-fallback', url: `${config.lavalink.host}:${config.lavalink.port}`, auth: config.lavalink.password, secure: false, group: 'fallback' }
+      { name: 'triniumhost', url: 'lavalink-v4.triniumhost.com:443', auth: 'free', secure: true, group: 'public' }
     ];
 
     this.shoukaku = new Shoukaku(new Connectors.DiscordJS(client), [], {
@@ -41,9 +41,9 @@ export class MusicManager {
         const connectedNodes = [...nodes.values()].filter(n => n.state === 1 /* CONNECTED */);
         if (connectedNodes.length === 0) return undefined;
         
-        const publicNodes = connectedNodes.filter(n => n.group === 'public');
-        if (publicNodes.length > 0) {
-            return publicNodes.sort((a, b) => a.penalties - b.penalties)[0];
+        const primaryNodes = connectedNodes.filter(n => n.group !== 'public');
+        if (primaryNodes.length > 0) {
+            return primaryNodes.sort((a, b) => a.penalties - b.penalties)[0];
         }
         return connectedNodes.sort((a, b) => a.penalties - b.penalties)[0];
       }
@@ -71,25 +71,25 @@ export class MusicManager {
     for (let attempt = 1; attempt <= 30; attempt++) {
       if (this.shoukaku.getIdealNode()) return;
 
+      const primaryNode = this.nodes.find(n => n.group === 'primary')!;
+      if (!this.shoukaku.nodes.has(primaryNode.name) && await this.isLavalinkHttpReady(primaryNode)) {
+          console.log(`[Lavalink] Adding primary node ${primaryNode.name}`);
+          this.shoukaku.addNode(primaryNode);
+      }
+
+      if (await this.waitForConnectedNode(3000)) return;
+
       const publicNodes = this.nodes.filter(n => n.group === 'public');
-      for (const pNode of publicNodes) {
-          if (!this.shoukaku.nodes.has(pNode.name)) {
-              console.log(`[Lavalink] Adding public node ${pNode.name}`);
-              this.shoukaku.addNode(pNode);
+      for (const publicNode of publicNodes) {
+          if (!this.shoukaku.nodes.has(publicNode.name)) {
+              console.log(`[Lavalink] Adding fallback node ${publicNode.name}`);
+              this.shoukaku.addNode(publicNode);
           }
       }
 
       if (await this.waitForConnectedNode(3000)) return;
 
-      console.warn(`[Lavalink] Public nodes not ready; retrying or falling back (${attempt}/30)`);
-      
-      if (attempt > 1) {
-          const fallbackNode = this.nodes.find(n => n.group === 'fallback')!;
-          if (!this.shoukaku.nodes.has(fallbackNode.name) && await this.isLavalinkHttpReady(fallbackNode)) {
-              console.log(`[Lavalink] Adding fallback node ${fallbackNode.name}`);
-              this.shoukaku.addNode(fallbackNode);
-          }
-      }
+      console.warn(`[Lavalink] Nodes not ready; retrying (${attempt}/30)`);
 
       await this.sleep(2000);
     }
