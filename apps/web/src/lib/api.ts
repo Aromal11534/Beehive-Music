@@ -5,6 +5,15 @@
 const CONFIGURED_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1';
 
 function normalizeApiBase(base: string) {
+  if (typeof window !== 'undefined') {
+    const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const configuredHost = base.startsWith('http') ? new URL(base).hostname : window.location.hostname;
+
+    if (isLocalHost || configuredHost !== window.location.hostname) {
+      return window.location.port === '3000' ? `http://${window.location.hostname}:8001/api/v1` : '/api/v1';
+    }
+  }
+
   const trimmed = base.replace(/\/$/, '');
   return trimmed.endsWith('/api') ? `${trimmed}/v1` : trimmed;
 }

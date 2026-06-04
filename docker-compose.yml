@@ -1,4 +1,15 @@
 services:
+  # ── YouTube Cipher ─────────────────────────────────────
+  yt-cipher:
+    image: ghcr.io/kikkia/yt-cipher:master
+    container_name: beehive-yt-cipher
+    restart: unless-stopped
+    networks:
+      - beehive
+    environment:
+      - API_TOKEN=${YT_CIPHER_API_TOKEN:-local_dev_token}
+      - OVERRIDE_PLAYER_VARIANT=IAS
+
   # ── PostgreSQL ─────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
@@ -46,6 +57,7 @@ services:
       - _JAVA_OPTIONS=-Xmx2G
       - SERVER_PORT=2333
       - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD}
+      - YT_CIPHER_API_TOKEN=${YT_CIPHER_API_TOKEN:-local_dev_token}
     volumes:
       - ./infra/lavalink/application.yml:/opt/Lavalink/application.yml:ro
     ports:
@@ -55,6 +67,8 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    depends_on:
+      - yt-cipher
     networks:
       - beehive
 
