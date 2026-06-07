@@ -24,13 +24,17 @@ export function FallbackImage({
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // YouTube's maxresdefault.jpg frequently 404s for non-1080p videos, causing long timeouts before falling back.
+  // We rewrite it to mqdefault.jpg (320x180) which is guaranteed to exist and loads blazing fast.
+  const optimizedSrc = src?.replace('maxresdefault.jpg', 'mqdefault.jpg');
+
   // Reset state when the image source changes
   useEffect(() => {
     setError(false);
     setLoading(true);
   }, [src]);
 
-  if (!src || error) {
+  if (!optimizedSrc || error) {
     return (
       <div className={`absolute inset-0 flex h-full w-full items-center justify-center ${fallbackClassName}`}>
         <Icon name={fallbackIcon} className="h-1/2 w-1/2" />
@@ -47,7 +51,7 @@ export function FallbackImage({
       )}
       <Image 
         unoptimized
-        src={src} 
+        src={optimizedSrc} 
         alt={alt} 
         fill={fill} 
         className={`${className} transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`} 
