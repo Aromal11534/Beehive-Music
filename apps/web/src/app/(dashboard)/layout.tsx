@@ -11,19 +11,22 @@ import { GuildProvider } from '@/context/GuildContext';
 import { PlayerProvider } from '@/context/PlayerContext';
 import { GlobalPlayer } from '@/components/GlobalPlayer';
 
-const navigation: Array<{ name: string; href: string; icon: IconName }> = [
+const navigationTop: Array<{ name: string; href: string; icon: IconName }> = [
   { name: 'Now Playing', href: '/', icon: 'music' },
-  { name: 'Dashboard', href: '/dashboard', icon: 'chart' },
-  { name: 'Queue', href: '/queue', icon: 'queue' },
   { name: 'Playlists', href: '/playlists', icon: 'disc' },
   { name: 'Favorites', href: '/favorites', icon: 'star' },
+  { name: 'Dashboard', href: '/dashboard', icon: 'chart' },
+  { name: 'Queue', href: '/queue', icon: 'queue' },
   { name: 'History', href: '/history', icon: 'clock' },
   { name: 'Servers', href: '/servers', icon: 'server' },
-  { name: 'Settings', href: '/settings', icon: 'settings' },
 ];
 
 const adminNav: Array<{ name: string; href: string; icon: IconName }> = [
   { name: 'Admin', href: '/admin', icon: 'shield' },
+];
+
+const navigationBottom: Array<{ name: string; href: string; icon: IconName }> = [
+  { name: 'Settings', href: '/settings', icon: 'settings' },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -48,7 +51,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!isAuthenticated && !isLoading) return null;
 
-  const allNav = [...navigation, ...(user?.is_admin ? adminNav : [])];
+  const allNav = [...navigationTop, ...(user?.is_admin ? adminNav : []), ...navigationBottom];
   const avatarFilename = user?.avatar_path ? user.avatar_path.split(/[/\\]/).pop() : null;
   const avatarUrl = avatarFilename ? `${getApiBase()}/avatars/${avatarFilename}` : null;
 
