@@ -10,7 +10,7 @@ from app.core.exceptions import AuthenticationError
 from app.api.v1.deps import get_current_user, get_admin_user
 from app.schemas.guild import (
     GuildCreate, GuildUpdate, GuildResponse, GuildAccessCreate, GuildAccessResponse,
-    ServerSettingsUpdate, ServerSettingsResponse,
+    ServerSettingsUpdate, ServerSettingsResponse, GuildStatsResponse,
 )
 from app.schemas.playlist import PlaylistResponse
 from app.schemas.common import MessageResponse
@@ -223,3 +223,38 @@ async def list_guild_playlists(
         }
         for p in playlists
     ]
+
+@router.get("/{guild_id}/stats", response_model=GuildStatsResponse)
+async def get_guild_stats(
+    guild_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get statistics for a specific server (Admin only)."""
+    service = GuildService(db)
+    
+    # Check access
+    if not current_user.is_admin:
+        access = await service.check_access(current_user.id, guild_id)
+        if not access or access.role != "admin":
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="No admin access to this guild")
+            
+    from sqlalchemy import select, func
+    from app.models.history import PlayHistory
+    from app.models.playlist import Playlist
+    
+    # Get playbacks
+    result_plays = await db.execute(select(func.count(PlayHistory.id)).where(PlayHistory.guild_id == guild_id))
+    total_playbacks = result_plays.scalar() or 0
+    
+    # Get playlists
+    result_playlists = await db.execute(select(func.count(Playlist.id)).where(Playlist.owner_guild_id == guild_id))
+    total_playlists = result_playlists.scalar() or 0
+    
+    return GuildStatsResponse(
+        total_playbacks=total_playbacks,
+        total_playlists=total_playlists,
+        total_users=0,  # Not tracked individually in db yet
+        total_commands=0,  # Not tracked individually in db yet
+    )

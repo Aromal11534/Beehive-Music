@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import type { GuildAccess } from '@/lib/types';
 import { Icon } from '@/components/icons';
+import Link from 'next/link';
 
 const DISCORD_BOT_PERMISSIONS = '36785152';
 
@@ -118,13 +119,21 @@ export default function ServersPage() {
               <div className="flex justify-between items-center mt-3">
                 <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded-lg text-xs">Connected</span>
                 {access.role === 'admin' && (
-                  <button
-                    onClick={() => handleRemoveBot(access.guild_id)}
-                    disabled={removingId === access.guild_id}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 disabled:opacity-50 transition-colors cursor-pointer"
-                  >
-                    {removingId === access.guild_id ? 'Removing...' : 'Remove Bot'}
-                  </button>
+                  <div className="flex gap-2">
+                    <Link
+                      href={`/servers/${access.guild_id}`}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                    >
+                      View Server
+                    </Link>
+                    <button
+                      onClick={() => handleRemoveBot(access.guild_id)}
+                      disabled={removingId === access.guild_id}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 disabled:opacity-50 transition-colors cursor-pointer"
+                    >
+                      {removingId === access.guild_id ? 'Removing...' : 'Remove Bot'}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

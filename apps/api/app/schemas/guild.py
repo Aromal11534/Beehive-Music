@@ -71,3 +71,9 @@ class ServerSettingsResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+class GuildStatsResponse(BaseModel):
+    total_playbacks: int
+    total_playlists: int
+    total_users: int
+    total_commands: int
