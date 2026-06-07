@@ -207,11 +207,30 @@ export default function QueuePage() {
     }
   };
 
+  const handleClearQueue = () => {
+    if (sendCommand('clear')) {
+      toast.success('Queue cleared');
+    } else {
+      toast.error('Player connection is not ready');
+    }
+  };
+
   const track = state?.current_track;
 
   return (
     <div className="space-y-6 animate-slide-up relative pb-20">
-      <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">Queue</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">Queue</h1>
+        {optimisticQueue.length > 0 && (
+          <button 
+            onClick={handleClearQueue} 
+            className="text-xs font-semibold text-red-400 hover:text-red-300 bg-red-400/10 hover:bg-red-400/20 px-3 py-1.5 rounded transition flex items-center gap-1.5"
+          >
+            <Icon name="trash" className="w-3.5 h-3.5" />
+            Clear
+          </button>
+        )}
+      </div>
       
       {!track && optimisticQueue.length === 0 ? (
         <div className="glass-card p-16 text-center">
