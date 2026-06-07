@@ -95,9 +95,9 @@ export default function ServerDashboardPage() {
 
   const statCards = [
     { label: 'Total Playbacks', value: stats?.total_playbacks ?? 0, icon: 'music' as const, color: 'from-amber-500/20 to-amber-600/10' },
-    { label: 'Total Playlists', value: stats?.total_playlists ?? 0, icon: 'list' as const, color: 'from-blue-500/20 to-blue-600/10' },
+    { label: 'Total Playlists', value: stats?.total_playlists ?? 0, icon: 'library' as const, color: 'from-blue-500/20 to-blue-600/10' },
     { label: 'Total Users', value: stats?.total_users ?? 0, icon: 'users' as const, color: 'from-emerald-500/20 to-emerald-600/10' },
-    { label: 'Commands Executed', value: stats?.total_commands ?? 0, icon: 'terminal' as const, color: 'from-purple-500/20 to-purple-600/10' },
+    { label: 'Commands Executed', value: stats?.total_commands ?? 0, icon: 'chart' as const, color: 'from-purple-500/20 to-purple-600/10' },
   ];
 
   return (
@@ -138,7 +138,7 @@ export default function ServerDashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((stat) => (
-          <div key={stat.label} className="rounded-2xl bg-black/25 p-4 ring-1 ring-white/10 transition-colors hover:bg-black/40 overflow-hidden">
+          <div key={stat.label} className="glass-card p-5 hover:bg-white/5 transition-colors">
             <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-3`}>
               <Icon name={stat.icon} className="h-5 w-5 text-white" />
             </div>
