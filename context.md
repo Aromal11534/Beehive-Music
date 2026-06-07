@@ -1,19 +1,20 @@
 # Beehive Music System Context
 
 ## Overview
-Beehive Music is a full-stack Discord music bot with a real-time web dashboard. The project allows users to play music in Discord voice channels, control the queue from a web interface, manage playlists, and save favorite tracks.
+Beehive Music is a full-stack Discord music bot with a real-time web dashboard. The project allows users to play music in Discord voice channels, control the queue from a web interface, manage playlists, import Spotify playlists, and save favorite tracks.
 
 ## Architecture & Tech Stack
 
 ### 1. Web Application (`/apps/web`)
 - **Framework:** Next.js (React)
-- **Styling:** Tailwind CSS
+- **Styling:** Tailwind CSS (Premium glass-morphism aesthetic)
 - **Features:** 
   - Real-time player state visualization (Now Playing, Queue).
-  - Dashboard with recent activity and server stats.
-  - Playlist and Favorites management.
+  - Dashboard with dynamic playlists (Daily Mix, Quick Picks, Listen Again).
+  - Playlist and Favorites management with Spotify import capabilities.
   - Discord OAuth2 for authentication.
   - Interactive UI with drag-and-drop queue reordering (via `dnd-kit`).
+  - Seamless user feedback using custom `sonner` toasts.
 
 ### 2. Discord Bot (`/apps/bot`)
 - **Framework:** Node.js with `discord.js`.
@@ -30,10 +31,12 @@ Beehive Music is a full-stack Discord music bot with a real-time web dashboard. 
 - **Cache / PubSub:** Redis.
 - **Features:**
   - Exposes RESTful endpoints for the web UI (Playlists, Favorites, History, Stats).
+  - Handles robust error checking (e.g. 409 Conflicts for duplicate playlist/favorite items).
+  - Processes Spotify URL imports, translating them into track metadata via scraping, and mapping them to `ytmsearch` equivalents for playback.
   - Manages Discord OAuth token exchange and session validation.
   - Provides WebSocket connections to stream real-time player state from the Bot to the Web UI.
 
-### 4. Infrastructure
+### 4. Infrastructure & Production Notes
 - **Docker Compose:** The entire stack is containerized using `docker-compose.yml`.
   - `web` (Next.js)
   - `api` (FastAPI)
@@ -42,8 +45,7 @@ Beehive Music is a full-stack Discord music bot with a real-time web dashboard. 
   - `redis` (PubSub & Cache)
   - `lavalink` (Audio streaming node)
   - `nginx` & `certbot` (Reverse proxy and SSL)
-
----
+  - `yt-cipher` (Helper service for YouTube anti-bot workarounds)
 
 ## Core Data Flow (Real-Time Control)
 
@@ -51,55 +53,53 @@ A critical aspect of this system is how the Web UI controls the Discord Bot with
 
 1. **State Streaming (Bot -> Web):**
    - The Bot maintains the source of truth for the music player state.
-   - Every time the state changes (track starts, pauses, queue changes), the Bot publishes a JSON payload to the Redis channel `player:{guild_id}` and stores the latest snapshot under `player_state:{guild_id}`.
+   - Every time the state changes, the Bot publishes a JSON payload to the Redis channel `player:{guild_id}` and stores the latest snapshot under `player_state:{guild_id}`.
    - The FastAPI backend subscribes to `player:*`, normalizes the bot payload, and streams the state over an open WebSocket connection to the Next.js web client.
 
 2. **Remote Control (Web -> Bot):**
-   - When a user clicks a button on the Web UI (e.g., Pause, Skip, Move Queue Item), the web client sends a JSON action payload through the WebSocket to the FastAPI backend.
-   - FastAPI takes this payload and publishes it to a Redis channel named `web_command:{guild_id}`.
-   - The Node.js Discord Bot subscribes to `web_command:*`. When it receives a command, it parses the action (e.g., `play`, `pause`, `remove`, `move`, `jump`) and executes the corresponding method on its internal `MusicManager` or `QueueManager`.
-
----
+   - When a user clicks a button on the Web UI, the web client sends a JSON action payload through the WebSocket to the FastAPI backend.
+   - FastAPI publishes it to a Redis channel named `web_command:{guild_id}`.
+   - The Node.js Discord Bot subscribes to `web_command:*`. When it receives a command, it parses the action (e.g., `play`, `pause`, `remove`, `move`, `jump`, `shuffle`) and executes the corresponding method on its internal `MusicManager` or `QueueManager`.
 
 ## Recent Development History
 
-- **Web UI Overhaul:** Upgraded the visual aesthetics of the Dashboard, Playlists, Favorites, and Queue pages to use a premium glass-morphism design with Tailwind.
+- **Web UI Overhaul:** Upgraded the visual aesthetics of the Dashboard, Playlists, Favorites, and Queue pages to use a premium glass-morphism design with Tailwind. Implemented `sonner` for elegant UI toast notifications.
 - **Queue Manipulation:** 
-   - Implemented `dnd-kit` in the web application to allow drag-and-drop reordering of tracks in the queue.
-   - Added backend bot support for `move`, `remove`, and `jump` actions over Redis Pub/Sub to sync the UI queue state with the Lavalink queue.
-   - Fixed a major Queue page bug where delete/reorder could make the UI show "Queue is empty" while the bot queue stayed unchanged. Root cause: the Queue page had a duplicate WebSocket with different URL handling from the global player context. Queue actions now use the shared `PlayerContext.sendCommand`, and the bot only publishes queue state after valid `remove`/`move` operations.
-- **Favorites System:** 
-  - Created a Favorites page matching the Playlists aesthetic.
-  - Added inline "Favorite" star buttons across the Queue and Now Playing pages, allowing one-click track saving.
-- **Playlist Management:** 
-   - Fixed payload schemas so tracks from the queue and now playing views can be properly appended to existing user playlists.
+   - Implemented `dnd-kit` in the web application to allow drag-and-drop reordering.
+   - Backend bot supports `move`, `remove`, and `jump` actions over Redis Pub/Sub.
+- **Spotify Imports & Dynamic Playlists:** 
+   - Created Python import logic to scrape Spotify metadata via scraping and Spotify Anon API, translating them directly to generic searchable tracks format.
+   - Implemented dynamic dashboard playlists (Daily Mix, etc.) generated on the fly.
+- **Favorites & Playlist Robustness:** 
+   - Proper backend checks for duplicate tracks (409 Conflict) elegantly handled by the UI.
 
----
+## Production Deployment & Anti-Bot Workarounds
+
+After deploying Beehive Music to production, YouTube blocked automated stream traffic, resulting in errors like "Sign in to confirm you're not a bot".
+
+### Workarounds Implemented:
+1. **YouTube Music Primary:** Set the bot default search to `ytmsearch`.
+2. **YouTube OAuth:** Enabled YouTube OAuth in Lavalink, persisting the OAuth refresh token via environment config (`.env.server`).
+3. **YT-Cipher Service:** Added a self-hosted `yt-cipher` service to decipher YouTube's signature logic remotely. Lavalink is configured to use this internal endpoint.
+
+*Note: `beehive-yt-cipher` is an internal helper container and does not expose a public port. Ensure `.env.server` (containing OAuth & Cipher keys) is never committed.*
 
 ## Current Implementation Notes
 
-- The web dashboard is wrapped in `GuildProvider` and `PlayerProvider` in `apps/web/src/app/(dashboard)/layout.tsx`.
-- Player state and remote controls should be consumed through `apps/web/src/context/PlayerContext.tsx`.
-- Do not add page-specific player WebSocket connections unless there is a concrete reason. Duplicate sockets can drift from shared state and break queue controls.
-- Queue page remove/reorder lives in `apps/web/src/app/(dashboard)/queue/page.tsx` and sends `remove`, `move`, and `jump` commands through `sendCommand`.
-- Bot-side queue command handling lives in `apps/bot/src/index.ts` under the `web_command:*` Redis subscriber. Invalid `remove`/`move` indexes should not publish a new state snapshot.
-
----
+- The web dashboard is wrapped in `GuildProvider` and `PlayerProvider`.
+- Player state and remote controls are consumed through `PlayerContext.tsx`.
+- Do not add page-specific player WebSockets unless strictly necessary. Queue actions use the shared `PlayerContext.sendCommand`.
+- Bot-side queue command handling lives in `apps/bot/src/index.ts` under the `web_command:*` Redis subscriber.
 
 ## Directory Structure
 ```
 /
 ├── apps/
 │   ├── api/          # FastAPI Backend (Python)
-│   │   ├── app/      # Core API logic, Routers, DB Models, WebSockets
-│   │   └── ...
 │   ├── bot/          # Discord Bot (TypeScript)
-│   │   ├── src/      # Bot logic, MusicManager, QueueManager
-│   │   └── ...
 │   └── web/          # Next.js Frontend (TypeScript/React)
-│       ├── src/      # Pages, Components, Lib
-│       └── ...
 ├── infra/            # Nginx & Lavalink configurations
 ├── docker-compose.yml
+├── context.md        # This comprehensive documentation file
 └── README.md
 ```
