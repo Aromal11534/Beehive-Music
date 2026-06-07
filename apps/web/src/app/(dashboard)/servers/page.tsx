@@ -5,8 +5,6 @@ import { api } from '@/lib/api';
 import type { GuildAccess } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import Link from 'next/link';
-import Image from 'next/image';
-import { FastAverageColor } from 'fast-average-color';
 
 const DISCORD_BOT_PERMISSIONS = '36785152';
 
@@ -29,76 +27,6 @@ function getDiscordConnectUrl() {
 
   const redirectUri = encodeURIComponent(`${window.location.origin}/auth/discord/callback`);
   return `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify%20guilds`;
-}
-
-function ServerCard({
-  access,
-  removingId,
-  onRemove
-}: {
-  access: GuildAccess;
-  removingId: number | null;
-  onRemove: (id: number) => void;
-}) {
-  const [color, setColor] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (access.guild?.icon_url) {
-      const fac = new FastAverageColor();
-      fac.getColorAsync(access.guild.icon_url, { crossOrigin: 'anonymous' })
-        .then(res => setColor(res.hex))
-        .catch(() => {});
-    }
-  }, [access.guild?.icon_url]);
-
-  return (
-    <div 
-      className="glass-card p-5 transition-all duration-500 relative overflow-hidden group"
-      style={{
-        borderColor: color ? `${color}40` : undefined,
-      }}
-    >
-      <div 
-         className="absolute inset-0 opacity-0 group-hover:opacity-[0.15] transition-opacity duration-500 pointer-events-none"
-         style={{ backgroundColor: color || undefined }}
-      />
-      <div className="relative z-10">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
-            {access.guild?.icon_url ? (
-              <Image src={access.guild.icon_url} alt={access.guild.name || 'Server'} width={48} height={48} className="object-cover w-full h-full" unoptimized />
-            ) : (
-              <Icon name="server" className="h-6 w-6 text-zinc-500" />
-            )}
-          </div>
-          <div>
-            <h3 className="font-semibold text-zinc-200">{access.guild?.name || 'Unknown Server'}</h3>
-            <p className="text-xs text-zinc-500">Role: {access.role}</p>
-          </div>
-        </div>
-        <div className="flex justify-between items-center mt-3">
-          <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded-lg text-xs font-medium">Connected</span>
-          {access.role === 'admin' && (
-            <div className="flex gap-2">
-              <Link
-                href={`/servers/${access.guild_id}`}
-                className="text-xs px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-colors cursor-pointer"
-              >
-                View Server
-              </Link>
-              <button
-                onClick={() => onRemove(access.guild_id)}
-                disabled={removingId === access.guild_id}
-                className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 disabled:opacity-50 transition-colors cursor-pointer"
-              >
-                {removingId === access.guild_id ? 'Removing...' : 'Remove Bot'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default function ServersPage() {
@@ -180,7 +108,35 @@ export default function ServersPage() {
       {guilds.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {guilds.map((access) => (
-            <ServerCard key={access.id} access={access} removingId={removingId} onRemove={handleRemoveBot} />
+            <div key={access.id} className="glass-card p-5 hover:border-amber-500/20 transition-colors">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center text-xl"><Icon name="server" className="h-6 w-6 text-amber-400" /></div>
+                <div>
+                  <h3 className="font-semibold text-zinc-200">{access.guild?.name || 'Unknown Server'}</h3>
+                  <p className="text-xs text-zinc-500">Role: {access.role}</p>
+                </div>
+              </div>
+              <div className="flex justify-between items-center mt-3">
+                <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded-lg text-xs">Connected</span>
+                {access.role === 'admin' && (
+                  <div className="flex gap-2">
+                    <Link
+                      href={`/servers/${access.guild_id}`}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                    >
+                      View Server
+                    </Link>
+                    <button
+                      onClick={() => handleRemoveBot(access.guild_id)}
+                      disabled={removingId === access.guild_id}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 disabled:opacity-50 transition-colors cursor-pointer"
+                    >
+                      {removingId === access.guild_id ? 'Removing...' : 'Remove Bot'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           ))}
         </div>
       ) : (

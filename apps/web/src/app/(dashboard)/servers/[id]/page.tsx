@@ -9,6 +9,7 @@ import type { Guild, TrackHistoryEntry } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import { BackgroundWaveform } from '@/components/BackgroundWaveform';
 import { usePlayer } from '@/context/PlayerContext';
+import { FastAverageColor } from 'fast-average-color';
 
 interface ServerStats {
   total_playbacks: int;
@@ -35,6 +36,7 @@ export default function ServerDashboardPage() {
   const [history, setHistory] = useState<TrackHistoryEntry[]>([]);
   const [settings, setSettings] = useState<ServerSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accentColor, setAccentColor] = useState<string | null>(null);
 
   const { state } = usePlayer();
   const isPlaying = !!(state && state.is_playing && !state.is_paused && state.guild_id === guild?.discord_guild_id);
@@ -47,6 +49,13 @@ export default function ServerDashboardPage() {
       try {
         const guildData = await api.get<Guild>(`/guilds/${guildId}`);
         setGuild(guildData);
+
+        if (guildData?.icon_url) {
+          const fac = new FastAverageColor();
+          fac.getColorAsync(guildData.icon_url, { crossOrigin: 'anonymous' })
+            .then(res => setAccentColor(res.hex))
+            .catch(() => {});
+        }
 
         // Load these independently so they don't break the page if backend isn't reloaded yet
         Promise.allSettled([
@@ -109,8 +118,22 @@ export default function ServerDashboardPage() {
       </Link>
 
       {/* Top Banner */}
-      <div className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#3d1c04] via-[#210f04] to-[#111111] p-6 lg:p-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,_rgba(245,158,11,0.15),_transparent_30%)]" />
+      <div 
+        className="relative overflow-hidden rounded-[22px] p-6 lg:p-10 bg-[#111111]"
+        style={{
+          backgroundImage: accentColor 
+            ? `linear-gradient(to bottom right, ${accentColor}33, ${accentColor}11, #111111)` 
+            : 'linear-gradient(to bottom right, #3d1c04, #210f04, #111111)'
+        }}
+      >
+        <div 
+          className="absolute inset-0 pointer-events-none" 
+          style={{
+            backgroundImage: accentColor
+              ? `radial-gradient(circle at 70% 20%, ${accentColor}25, transparent 30%)`
+              : 'radial-gradient(circle at 70% 20%, rgba(245,158,11,0.15), transparent 30%)'
+          }}
+        />
         <div className="absolute inset-0 overflow-hidden rounded-[22px] pointer-events-none">
           <BackgroundWaveform isPlaying={isPlaying} track={track} />
         </div>
