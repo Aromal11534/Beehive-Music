@@ -32,24 +32,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [splashFading, setSplashFading] = useState(false);
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login');
+    } else if (!isLoading && isAuthenticated) {
+      // Keep the splash screen for 1.5 seconds to let images and content load
+      const fadeTimer = setTimeout(() => setSplashFading(true), 1500);
+      const removeTimer = setTimeout(() => setSplashVisible(false), 2000);
+      return () => { clearTimeout(fadeTimer); clearTimeout(removeTimer); };
     }
   }, [isLoading, isAuthenticated, router]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-          <div className="text-center animate-fade-in">
-            <BrandMark className="w-16 h-16 mx-auto mb-4 animate-pulse-glow" />
-          <p className="text-zinc-500">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated && !isLoading) return null;
 
   const allNav = [...navigation, ...(user?.is_admin ? adminNav : [])];
   const avatarFilename = user?.avatar_path ? user.avatar_path.split(/[/\\]/).pop() : null;
@@ -58,8 +55,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <GuildProvider>
       <PlayerProvider>
-        <div className="h-screen bg-zinc-950 flex overflow-hidden">
-        {/* Sidebar */}
+        {/* Splash Screen Overlay */}
+        {splashVisible && (
+          <div className={`fixed inset-0 z-[100] bg-zinc-950 flex flex-col items-center justify-center transition-opacity duration-500 overflow-hidden ${splashFading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-zinc-950 to-zinc-950 pointer-events-none"></div>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.15),_transparent_40%),radial-gradient(circle_at_bottom_right,_rgba(245,158,11,0.05),_transparent_40%)] pointer-events-none"></div>
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div className="relative z-10 flex flex-col items-center text-center max-w-lg">
+              <div className="relative">
+                <BrandMark className="w-24 h-24 rounded-[2rem] mb-8 shadow-2xl shadow-amber-500/30" />
+                <div className="absolute inset-0 w-24 h-24 rounded-[2rem] shadow-[0_0_40px_rgba(245,158,11,0.5)] animate-ping opacity-20"></div>
+              </div>
+              <h1 className="text-5xl font-semibold text-white tracking-tight mb-4">Beehive Music</h1>
+              <p className="text-lg text-amber-500/80 font-medium animate-pulse">
+                Warming up the servers...
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Main Application */}
+        {(!isLoading && isAuthenticated) && (
+          <div className="h-screen bg-zinc-950 flex overflow-hidden">
+          {/* Sidebar */}
         <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800/50 transform transition-transform duration-300 lg:translate-x-0 lg:static ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           {/* Logo */}
           <div className="h-16 flex items-center gap-3 px-6 border-b border-zinc-800/50">
@@ -156,6 +175,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         
         <GlobalPlayer />
       </div>
+      )}
       </PlayerProvider>
     </GuildProvider>
   );
