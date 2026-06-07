@@ -59,8 +59,7 @@ export function FallbackImage({
         ref={imgRef}
         src={optimizedSrc} 
         alt={alt} 
-        loading="lazy"
-        className={`${className} transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'} ${fill ? 'absolute inset-0 w-full h-full' : ''}`} 
+        className={`${className} transition-opacity duration-150 ${loading ? 'opacity-0' : 'opacity-100'} ${fill ? 'absolute inset-0 w-full h-full' : ''}`} 
         onLoad={() => setLoading(false)}
         onError={() => {
           setError(true);
