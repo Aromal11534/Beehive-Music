@@ -94,24 +94,32 @@ function PlaylistsContent() {
     if (!importUrl.trim()) return;
     setImporting(true);
     
-    const payload: any = { url: importUrl, playlist_type: activeTab };
-    if (activeTab === 'server') {
-      const g = guilds.find(g => g.guild?.discord_guild_id === selectedGuild);
-      if (!g || !g.guild_id) {
-        alert("Cannot import server playlist: no server selected.");
-        setImporting(false);
-        return;
-      }
-      payload.owner_guild_id = g.guild_id;
-    }
-
     try {
-      const p = await api.post<PlaylistDetail>('/playlists/import', payload);
+      let p;
+      if (selectedPlaylist && typeof selectedPlaylist.id === 'number') {
+        p = await api.post<PlaylistDetail>(`/playlists/${selectedPlaylist.id}/import`, { url: importUrl });
+      } else {
+        const payload: any = { url: importUrl, playlist_type: activeTab };
+        if (activeTab === 'server') {
+          const g = guilds.find(g => g.guild?.discord_guild_id === selectedGuild);
+          if (!g || !g.guild_id) {
+            alert("Cannot import server playlist: no server selected.");
+            setImporting(false);
+            return;
+          }
+          payload.owner_guild_id = g.guild_id;
+        }
+        p = await api.post<PlaylistDetail>('/playlists/import', payload);
+      }
+      
       setImportUrl('');
       setShowImportModal(false);
       loadPlaylists();
       loadPlaylist(p.id);
-      router.push(`/playlists?id=${p.id}&name=${encodeURIComponent(p.name)}`);
+      
+      if (!selectedPlaylist) {
+        router.push(`/playlists?id=${p.id}&name=${encodeURIComponent(p.name)}`);
+      }
     } catch (err: any) {
       alert(err.response?.data?.detail || "Failed to import playlist.");
     } finally {
@@ -380,6 +388,13 @@ function PlaylistsContent() {
                                   <Icon name="list-plus" className="w-4 h-4 text-emerald-400" />
                                   Add to queue
                                 </button>
+                                <button 
+                                  onClick={() => { setShowImportModal(true); setShowDropdown(false); }}
+                                  className="w-full px-4 py-3 text-left text-sm text-zinc-200 hover:bg-white/5 rounded-xl flex items-center gap-3 transition-colors font-semibold"
+                                >
+                                  <Icon name="plus" className="w-4 h-4 text-emerald-400" />
+                                  Import Tracks
+                                </button>
                                 <div className="h-px bg-white/5 my-1 mx-2" />
                                 <button 
                                   onClick={() => { setShowDeleteModal(true); setShowDropdown(false); }}
@@ -586,7 +601,7 @@ function PlaylistsContent() {
             <div className="relative p-6 border-b border-white/5 flex justify-between items-start">
               <div className="flex flex-col gap-1 pr-4">
                 <h3 className="text-xl font-black text-white">
-                  Import Playlist
+                  {selectedPlaylist ? `Import into ${selectedPlaylist.name}` : 'Import Playlist'}
                 </h3>
                 <p className="text-sm text-zinc-400">
                   Paste a link from Spotify or YouTube Music.

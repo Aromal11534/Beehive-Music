@@ -8,7 +8,7 @@ from app.api.v1.deps import get_current_user
 from app.schemas.playlist import (
     PlaylistCreate, PlaylistUpdate, PlaylistResponse,
     PlaylistDetailResponse, PlaylistTrackAdd, PlaylistTrackResponse,
-    PlaylistImportRequest
+    PlaylistImportRequest, PlaylistAppendRequest
 )
 from app.schemas.common import MessageResponse
 from app.services.playlist_service import PlaylistService
@@ -86,6 +86,46 @@ async def import_playlist(
     return PlaylistResponse(
         **{c.name: getattr(playlist, c.name) for c in playlist.__table__.columns},
         track_count=len(imported_data["tracks"]),
+    )
+
+
+@router.post("/{playlist_id}/import", response_model=PlaylistResponse, status_code=201)
+async def append_playlist(
+    playlist_id: int,
+    data: PlaylistAppendRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Append a playlist from Spotify or YouTube Music to an existing playlist."""
+    from app.services.importer import importer
+    from fastapi import HTTPException
+    
+    # First verify the playlist exists and the user can modify it
+    service = PlaylistService(db)
+    playlist = await service.get_playlist(playlist_id)
+    await service._ensure_can_modify(playlist, current_user.id, current_user.is_admin)
+
+    try:
+        imported_data = await importer.fetch_playlist(data.url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+        
+    added_count = 0
+    # Add all tracks
+    for track_data in imported_data["tracks"]:
+        try:
+            track_add = PlaylistTrackAdd(**track_data)
+            await service.add_track(playlist_id, track_add, current_user.id, current_user.is_admin)
+            added_count += 1
+        except Exception as e:
+            # Duplicate tracks will throw an exception which we silently ignore to deduplicate
+            pass
+
+    # Re-fetch playlist to get updated track count
+    playlist = await service.get_playlist(playlist_id)
+    return PlaylistResponse(
+        **{c.name: getattr(playlist, c.name) for c in playlist.__table__.columns},
+        track_count=len(playlist.tracks),
     )
 
 

@@ -17,6 +17,10 @@ class PlaylistImportRequest(BaseModel):
     owner_guild_id: int | None = None
 
 
+class PlaylistAppendRequest(BaseModel):
+    url: str = Field(..., max_length=1024)
+
+
 class PlaylistUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=128)
     description: str | None = None
