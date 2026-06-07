@@ -42,9 +42,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
           <div className="text-center animate-fade-in">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
-            <BrandMark className="h-9 w-9 text-zinc-950" />
-          </div>
+            <BrandMark className="w-16 h-16 mx-auto mb-4 animate-pulse-glow" />
           <p className="text-zinc-500">Loading...</p>
         </div>
       </div>
@@ -65,9 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800/50 transform transition-transform duration-300 lg:translate-x-0 lg:static ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           {/* Logo */}
           <div className="h-16 flex items-center gap-3 px-6 border-b border-zinc-800/50">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
-              <BrandMark className="h-5 w-5 text-zinc-950" />
-            </div>
+            <BrandMark className="w-9 h-9" />
             <span className="text-lg font-semibold text-zinc-100">Beehive Music</span>
           </div>
 

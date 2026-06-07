@@ -131,9 +131,7 @@ export default function LoginPage() {
         <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-zinc-950 to-transparent z-20 pointer-events-none"></div>
 
         <div className="relative z-10 flex flex-col items-center text-center max-w-lg animate-fade-in pr-12">
-          <div className="inline-flex items-center justify-center w-24 h-24 rounded-[2rem] bg-gradient-to-br from-amber-400 to-amber-600 mb-8 shadow-2xl shadow-amber-500/30">
-            <BrandMark className="h-12 w-12 text-zinc-950" />
-          </div>
+          <BrandMark className="w-24 h-24 rounded-[2rem] mb-8 shadow-2xl shadow-amber-500/30" />
           <h1 className="text-5xl font-semibold text-white tracking-tight mb-4">Beehive Music</h1>
           <p className="text-lg text-zinc-400 leading-relaxed font-medium">
             The ultimate music control panel for your Discord servers. Sync, play, and manage queues beautifully.
@@ -148,9 +146,7 @@ export default function LoginPage() {
         <div className="relative w-full max-w-md lg:-ml-12">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 mb-4 shadow-xl shadow-amber-500/20">
-              <BrandMark className="h-8 w-8 text-zinc-950" />
-            </div>
+            <BrandMark className="w-16 h-16 rounded-2xl mb-4 shadow-xl shadow-amber-500/20 mx-auto" />
             <h1 className="text-3xl font-semibold text-white">Beehive Music</h1>
           </div>
 
