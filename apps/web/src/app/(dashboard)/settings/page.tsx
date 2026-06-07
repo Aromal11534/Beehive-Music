@@ -195,7 +195,8 @@ export default function SettingsPage() {
   const avatarUrl = avatarFilename ? `${getApiBase()}/avatars/${avatarFilename}` : null;
 
   return (
-    <div className="p-6 lg:p-10 w-full max-w-7xl mx-auto space-y-6 animate-fade-in">
+    <>
+      <div className="p-6 lg:p-10 w-full max-w-7xl mx-auto space-y-6 animate-fade-in">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-3xl font-black text-zinc-100">Settings</h1>
@@ -467,6 +468,6 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
