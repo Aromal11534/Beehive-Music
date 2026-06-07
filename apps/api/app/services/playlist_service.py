@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import NotFoundError, AuthorizationError
 from app.models.guild import UserGuildAccess
+from app.models.history import PlayHistory
 from app.models.playlist import Playlist, PlaylistTrack
 from app.schemas.playlist import PlaylistCreate, PlaylistUpdate, PlaylistTrackAdd
 
@@ -54,12 +55,7 @@ class PlaylistService:
             select(Playlist).where(Playlist.owner_user_id == user_id).order_by(Playlist.updated_at.desc())
         )
         playlists = list(result.scalars().all())
-        # Attach track counts
-        for p in playlists:
-            count_result = await self.db.execute(
-                select(func.count()).where(PlaylistTrack.playlist_id == p.id)
-            )
-            p.track_count = count_result.scalar() or 0
+        await self._populate_playlist_metadata(playlists)
         return playlists
 
     async def list_guild_playlists(self, guild_id: int):
@@ -69,7 +65,27 @@ class PlaylistService:
                 Playlist.playlist_type == "server",
             ).order_by(Playlist.updated_at.desc())
         )
-        return list(result.scalars().all())
+        playlists = list(result.scalars().all())
+        await self._populate_playlist_metadata(playlists)
+        return playlists
+
+    async def _populate_playlist_metadata(self, playlists: list[Playlist]):
+        for p in playlists:
+            count_result = await self.db.execute(
+                select(func.count()).where(PlaylistTrack.playlist_id == p.id)
+            )
+            p.track_count = count_result.scalar() or 0
+            
+            artwork_query = (
+                select(PlaylistTrack.artwork_url)
+                .outerjoin(PlayHistory, PlayHistory.track_url == PlaylistTrack.track_url)
+                .where(PlaylistTrack.playlist_id == p.id, PlaylistTrack.artwork_url.isnot(None))
+                .group_by(PlaylistTrack.artwork_url)
+                .order_by(func.count(PlayHistory.id).desc(), func.min(PlaylistTrack.position).asc())
+                .limit(4)
+            )
+            artwork_result = await self.db.execute(artwork_query)
+            p.top_artworks = list(artwork_result.scalars().all())
 
     async def update_playlist(self, playlist_id: int, data: PlaylistUpdate, user_id: int, is_admin: bool = False) -> Playlist:
         playlist = await self.get_playlist(playlist_id)

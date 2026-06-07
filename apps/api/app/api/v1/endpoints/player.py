@@ -50,7 +50,8 @@ class PlayAction(str, Enum):
 
 class PlayRequest(BaseModel):
     guild_id: str = Field(..., min_length=1, max_length=20)
-    track: TrackData
+    track: Optional[TrackData] = None
+    tracks: Optional[list[TrackData]] = Field(None, max_length=1000)
     action: PlayAction = PlayAction.play
 
 
@@ -120,7 +121,8 @@ async def play_track(
     await require_guild_access_by_discord_id(data.guild_id, current_user, db)
     await redis_client.publish("web_play:request", json.dumps({
         "guild_id": data.guild_id,
-        "track": data.track.model_dump(),
+        "track": data.track.model_dump() if data.track else None,
+        "tracks": [t.model_dump() for t in data.tracks] if data.tracks else None,
         "action": data.action.value,
         "user_discord_id": current_user.discord_id,
     }))
@@ -165,15 +167,30 @@ async def player_websocket(
         return
 
     await ws_manager.connect(websocket, guild_id)
+    
+    # Send current state immediately on connect
+    state_raw = await redis_client.get(f"player_state:{guild_id}")
+    if state_raw:
+        try:
+            raw = json.loads(state_raw)
+            normalized = normalize_bot_state(raw)
+            await websocket.send_text(json.dumps(normalized))
+        except Exception:
+            pass
+
     try:
         while True:
             data = await websocket.receive_text()
+            logger.info(f"WS received data from {guild_id}: {data}")
             if data:
                 try:
                     command = json.loads(data)
-                    # Publish command to Redis for bot to pick up
+                    logger.info(f"Publishing command: {command}")
                     await redis_client.publish(f"web_command:{guild_id}", json.dumps(command))
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
+                    logger.error(f"JSON error: {e}")
                     pass
+                except Exception as e:
+                    logger.error(f"Error publishing: {e}")
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket, guild_id)

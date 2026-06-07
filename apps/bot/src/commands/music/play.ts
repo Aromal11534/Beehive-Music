@@ -7,6 +7,7 @@ import { LoadType, type Track } from 'shoukaku';
 import { BotCommand, QueueTrack } from '../../types';
 import { MusicManager } from '../../music/MusicManager';
 import { nowPlayingEmbed, trackAddedEmbed, errorEmbed } from '../../utils/embeds';
+import { getArtworkUrl } from '../../utils/helpers';
 
 let musicManager: MusicManager;
 export function setMusicManager(mm: MusicManager) { musicManager = mm; }
@@ -55,7 +56,11 @@ export const play: BotCommand = {
           url: t.info.uri ?? t.info.identifier,
           identifier: t.info.identifier,
           duration: t.info.length,
-          artworkUrl: t.info.artworkUrl,
+          artworkUrl: getArtworkUrl({
+            artworkUrl: t.info.artworkUrl,
+            sourceName: t.info.sourceName,
+            identifier: t.info.identifier,
+          }),
           source: t.info.sourceName,
           requestedBy: interaction.user.displayName,
           requestedById: interaction.user.id,
@@ -79,7 +84,11 @@ export const play: BotCommand = {
         url: trackData.info.uri ?? trackData.info.identifier,
         identifier: trackData.info.identifier,
         duration: trackData.info.length,
-        artworkUrl: trackData.info.artworkUrl,
+        artworkUrl: getArtworkUrl({
+          artworkUrl: trackData.info.artworkUrl,
+          sourceName: trackData.info.sourceName,
+          identifier: trackData.info.identifier,
+        }),
         source: trackData.info.sourceName,
         requestedBy: interaction.user.displayName,
         requestedById: interaction.user.id,

@@ -11,6 +11,11 @@ class PlaylistCreate(BaseModel):
     owner_guild_id: int | None = None
     is_public: bool = False
 
+class PlaylistImportRequest(BaseModel):
+    url: str = Field(..., max_length=1024)
+    playlist_type: str = Field(default="personal", pattern=r"^(personal|server)$")
+    owner_guild_id: int | None = None
+
 
 class PlaylistUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=128)
@@ -55,6 +60,7 @@ class PlaylistResponse(BaseModel):
     playlist_type: str
     is_public: bool
     track_count: int = 0
+    top_artworks: list[str] = []
     created_at: datetime
     updated_at: datetime
 

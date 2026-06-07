@@ -33,6 +33,8 @@ Pillow>=10.0.0
 # Utilities
 httpx>=0.27.0,<1.0.0
 slowapi>=0.1.9,<1.0.0
+spotipy>=2.23.0
+ytmusicapi>=1.5.0
 
 # Testing
 pytest>=8.0.0

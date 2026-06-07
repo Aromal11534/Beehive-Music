@@ -8,6 +8,7 @@ from app.api.v1.deps import get_current_user
 from app.schemas.playlist import (
     PlaylistCreate, PlaylistUpdate, PlaylistResponse,
     PlaylistDetailResponse, PlaylistTrackAdd, PlaylistTrackResponse,
+    PlaylistImportRequest
 )
 from app.schemas.common import MessageResponse
 from app.services.playlist_service import PlaylistService
@@ -27,6 +28,7 @@ async def list_my_playlists(
     return [PlaylistResponse(
         **{c.name: getattr(p, c.name) for c in p.__table__.columns},
         track_count=getattr(p, 'track_count', 0),
+        top_artworks=getattr(p, 'top_artworks', []),
     ) for p in playlists]
 
 
@@ -43,6 +45,49 @@ async def create_playlist(
         **{c.name: getattr(playlist, c.name) for c in playlist.__table__.columns},
         track_count=0,
     )
+
+
+@router.post("/import", response_model=PlaylistResponse, status_code=201)
+async def import_playlist(
+    data: PlaylistImportRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Import a playlist from Spotify or YouTube Music."""
+    from app.services.importer import importer
+    from fastapi import HTTPException
+    
+    try:
+        imported_data = await importer.fetch_playlist(data.url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+        
+    service = PlaylistService(db)
+    
+    # Create the playlist
+    playlist_create = PlaylistCreate(
+        name=imported_data["name"],
+        description=imported_data["description"],
+        playlist_type=data.playlist_type,
+        owner_guild_id=data.owner_guild_id,
+        is_public=False
+    )
+    playlist = await service.create_playlist(playlist_create, current_user.id)
+    
+    # Add all tracks
+    for track_data in imported_data["tracks"]:
+        try:
+            track_add = PlaylistTrackAdd(**track_data)
+            await service.add_track(playlist.id, track_add, current_user.id, current_user.is_admin)
+        except Exception as e:
+            print(f"Failed to add track {track_data.get('track_title')}: {e}")
+            pass # Skip invalid tracks
+            
+    return PlaylistResponse(
+        **{c.name: getattr(playlist, c.name) for c in playlist.__table__.columns},
+        track_count=len(imported_data["tracks"]),
+    )
+
 
 
 @router.get("/{playlist_id}", response_model=PlaylistDetailResponse)

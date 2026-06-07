@@ -264,35 +264,42 @@ async function main() {
     try {
       console.log(`[WebPlay] Received play request`);
       const data = JSON.parse(message);
-      const { guild_id, track, action, user_discord_id } = data;
-      if (!guild_id || !track) {
-        console.error('[WebPlay] Missing guild_id or track');
+      const { guild_id, track, tracks, action, user_discord_id } = data;
+      if (!guild_id || (!track && !tracks)) {
+        console.error('[WebPlay] Missing guild_id or track(s)');
         return;
       }
 
       const queue = musicManager.getQueue(guild_id);
 
-      const playableTrack = track;
+      const tracksToAdd = tracks || [track];
+      if (tracksToAdd.length === 0) return;
 
-      const queueTrack: QueueTrack = {
-        encoded: playableTrack.encoded,
-        title: playableTrack.title,
-        author: playableTrack.author,
-        url: playableTrack.url || playableTrack.identifier,
-        identifier: playableTrack.identifier,
-        duration: playableTrack.duration,
-        artworkUrl: playableTrack.artwork_url || playableTrack.artworkUrl,
-        source: playableTrack.source,
+      const queueTracks: QueueTrack[] = tracksToAdd.map((t: any) => ({
+        encoded: t.encoded,
+        title: t.title,
+        author: t.author,
+        url: t.url || t.identifier,
+        identifier: t.identifier,
+        duration: t.duration,
+        artworkUrl: t.artwork_url || t.artworkUrl,
+        source: t.source,
         requestedBy: 'Web Panel',
         requestedById: user_discord_id,
-      };
+      }));
 
       if (action === 'queue') {
-        queue.add(queueTrack);
+        queue.addMany(queueTracks);
         await musicManager.publishState(guild_id);
       } else {
         // Play now
-        if (!queue.current) {
+        queue.clear();
+        const first = queueTracks.shift();
+        if (queueTracks.length > 0) {
+          queue.addMany(queueTracks);
+        }
+
+        if (first) {
           const guild = client.guilds.cache.get(guild_id);
           let vcId: string | undefined;
 
@@ -320,18 +327,13 @@ async function main() {
 
           if (vcId) {
             await musicManager.joinChannel(guild_id, vcId);
-            queue.current = queueTrack;
-            await musicManager.playTrack(guild_id, queueTrack);
+            queue.current = first;
+            await musicManager.playTrack(guild_id, first);
           } else {
             console.warn(`[WebPlay] Aborted: Could not find a suitable voice channel to join in guild ${guild_id}`);
             // Explicitly publish state so web UI doesn't get stuck thinking it's loading
             await musicManager.publishState(guild_id);
           }
-        } else {
-          queue.addNext(queueTrack);
-          // Skip to it
-          const next = queue.next();
-          if (next) await musicManager.playTrack(guild_id, next);
         }
       }
     } catch (e) {

@@ -111,7 +111,7 @@ export default function FavoritesPage() {
                             {feedbackId === `${t.id}-play` ? <Icon name="check-circle" className="w-4 h-4" /> : <Icon name="play" className="w-4 h-4" />}
                           </button>
                           <button onClick={() => handlePlay(t, 'queue')} className="p-2 rounded-full hover:bg-white/10 text-zinc-300 transition" title="Add to Queue">
-                            {feedbackId === `${t.id}-queue` ? <Icon name="check-circle" className="w-4 h-4 text-amber-400" /> : <Icon name="plus" className="w-4 h-4" />}
+                            {feedbackId === `${t.id}-queue` ? <Icon name="check-circle" className="w-4 h-4 text-amber-400" /> : <Icon name="list-plus" className="w-4 h-4" />}
                           </button>
                           <button onClick={(e) => removeFavorite(t.id, e)} className="p-2 rounded-full hover:bg-red-500/20 hover:text-red-400 text-zinc-500 transition" title="Remove from Favorites">
                             <Icon name="x" className="w-4 h-4" />

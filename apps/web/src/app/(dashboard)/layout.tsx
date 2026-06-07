@@ -8,6 +8,8 @@ import { BrandMark, Icon, type IconName } from '@/components/icons';
 import { getApiBase } from '@/lib/api';
 import { TopSearchBar } from '@/components/TopSearchBar';
 import { GuildProvider } from '@/context/GuildContext';
+import { PlayerProvider } from '@/context/PlayerContext';
+import { GlobalPlayer } from '@/components/GlobalPlayer';
 
 const navigation: Array<{ name: string; href: string; icon: IconName }> = [
   { name: 'Now Playing', href: '/', icon: 'music' },
@@ -57,7 +59,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <GuildProvider>
-      <div className="h-screen bg-zinc-950 flex overflow-hidden">
+      <PlayerProvider>
+        <div className="h-screen bg-zinc-950 flex overflow-hidden">
         {/* Sidebar */}
         <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800/50 transform transition-transform duration-300 lg:translate-x-0 lg:static ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           {/* Logo */}
@@ -150,11 +153,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Page content */}
-          <main className="flex-1 p-6 min-h-0 overflow-y-auto animate-fade-in flex flex-col relative">
+          <main className="flex-1 p-6 pb-28 min-h-0 overflow-y-auto animate-fade-in flex flex-col relative">
             {children}
           </main>
         </div>
+        
+        <GlobalPlayer />
       </div>
+      </PlayerProvider>
     </GuildProvider>
   );
 }

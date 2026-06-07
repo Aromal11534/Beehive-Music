@@ -44,6 +44,7 @@ export interface PlaylistSummary {
   id: number;
   name: string;
   track_count?: number;
+  top_artworks?: string[];
   playlist_type: string;
 }
 

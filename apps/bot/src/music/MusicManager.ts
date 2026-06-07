@@ -12,7 +12,6 @@ import { RedisService } from '../services/RedisService';
 export class MusicManager {
   public shoukaku: Shoukaku;
   public queues: Map<string, QueueManager> = new Map();
-  public players: Map<string, Player> = new Map();
   private client: Client;
   private redis: RedisService;
   private nodes: NodeOption[];
@@ -41,7 +40,7 @@ export class MusicManager {
         const connectedNodes = [...nodes.values()].filter(n => n.state === 1 /* CONNECTED */);
         if (connectedNodes.length === 0) return undefined;
         
-        const primaryNodes = connectedNodes.filter(n => n.group !== 'public');
+        const primaryNodes = connectedNodes.filter(n => n.group === 'primary');
         if (primaryNodes.length > 0) {
             return primaryNodes.sort((a, b) => a.penalties - b.penalties)[0];
         }
@@ -138,7 +137,7 @@ export class MusicManager {
   }
 
   async joinChannel(guildId: string, channelId: string): Promise<Player> {
-    let player = this.players.get(guildId);
+    let player = this.shoukaku.players.get(guildId);
     if (player) return player;
 
     await this.connectLavalink();
@@ -152,8 +151,6 @@ export class MusicManager {
       shardId: 0,
       deaf: true,
     });
-
-    this.players.set(guildId, player);
 
     // Set up event handlers
     player.on('end', async (data) => {
@@ -198,11 +195,20 @@ export class MusicManager {
   }
 
   async playTrack(guildId: string, track: QueueTrack): Promise<void> {
-    const player = this.players.get(guildId);
-    if (!player) return;
-
     const queue = this.getQueue(guildId);
     queue.current = track;
+
+    const player = this.shoukaku.players.get(guildId);
+    if (!player) {
+      // If there's no player, we can't play the track.
+      // Revert the current track to be the first in queue so it's not lost.
+      if (queue.current === track) {
+        queue.current = null;
+        queue.addNext(track);
+      }
+      await this.publishState(guildId);
+      return;
+    }
 
     try {
       const payload = {
@@ -222,6 +228,7 @@ export class MusicManager {
     }
 
     if (track.encoded) {
+      await player.setPaused(false);
       await player.playTrack({ track: { encoded: track.encoded } });
       await this.publishState(guildId);
       return;
@@ -232,17 +239,23 @@ export class MusicManager {
     const node = this.shoukaku.options.nodeResolver(this.shoukaku.nodes);
     if (!node) return;
 
-    const result = await node.rest.resolve(track.url);
+    let resolveUrl = track.url;
+    if (track.source === 'spotify' || (resolveUrl && resolveUrl.includes('spotify.com'))) {
+      resolveUrl = `ytmsearch:${track.title} ${track.author}`;
+    }
+
+    const result = await node.rest.resolve(resolveUrl);
     const resolvedTrack = Array.isArray(result?.data) ? result.data[0] : result?.data;
 
     if (resolvedTrack && 'encoded' in resolvedTrack && typeof resolvedTrack.encoded === 'string') {
+      await player.setPaused(false);
       await player.playTrack({ track: { encoded: resolvedTrack.encoded } });
       await this.publishState(guildId);
     }
   }
 
   async stop(guildId: string): Promise<void> {
-    const player = this.players.get(guildId);
+    const player = this.shoukaku.players.get(guildId);
     if (player) {
       await player.stopTrack();
     }
@@ -255,12 +268,11 @@ export class MusicManager {
   async disconnect(guildId: string): Promise<void> {
     await this.stop(guildId);
     await this.shoukaku.leaveVoiceChannel(guildId);
-    this.players.delete(guildId);
     this.queues.delete(guildId);
   }
 
   async setVolume(guildId: string, volume: number): Promise<void> {
-    const player = this.players.get(guildId);
+    const player = this.shoukaku.players.get(guildId);
     if (player) {
       await player.setGlobalVolume(volume);
       const queue = this.getQueue(guildId);
@@ -270,7 +282,7 @@ export class MusicManager {
   }
 
   async seek(guildId: string, positionMs: number): Promise<void> {
-    const player = this.players.get(guildId);
+    const player = this.shoukaku.players.get(guildId);
     if (player) {
       await player.seekTo(positionMs);
       await this.publishState(guildId);
@@ -278,7 +290,7 @@ export class MusicManager {
   }
 
   async pause(guildId: string): Promise<void> {
-    const player = this.players.get(guildId);
+    const player = this.shoukaku.players.get(guildId);
     if (player) {
       await player.setPaused(true);
       await this.publishState(guildId);
@@ -286,7 +298,7 @@ export class MusicManager {
   }
 
   async resume(guildId: string): Promise<void> {
-    const player = this.players.get(guildId);
+    const player = this.shoukaku.players.get(guildId);
     if (player) {
       await player.setPaused(false);
       await this.publishState(guildId);
@@ -295,7 +307,7 @@ export class MusicManager {
 
   getState(guildId: string): GuildPlayerState {
     const queue = this.getQueue(guildId);
-    const player = this.players.get(guildId);
+    const player = this.shoukaku.players.get(guildId);
 
     return {
       guildId,

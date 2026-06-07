@@ -12,6 +12,7 @@ from app.schemas.guild import (
     GuildCreate, GuildUpdate, GuildResponse, GuildAccessCreate, GuildAccessResponse,
     ServerSettingsUpdate, ServerSettingsResponse,
 )
+from app.schemas.playlist import PlaylistResponse
 from app.schemas.common import MessageResponse
 from app.services.guild_service import GuildService
 from app.models.user import User
@@ -192,3 +193,33 @@ async def update_settings(
     """Update server settings."""
     service = GuildService(db)
     return await service.update_settings(guild_id, **data.model_dump(exclude_unset=True))
+
+
+@router.get("/{guild_id}/playlists", response_model=list[PlaylistResponse])
+async def list_guild_playlists(
+    guild_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List server playlists for a guild."""
+    service = GuildService(db)
+    
+    # Check access
+    if not current_user.is_admin:
+        access = await service.check_access(current_user.id, guild_id)
+        if not access:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="No access to this guild")
+            
+    from app.services.playlist_service import PlaylistService
+    playlist_service = PlaylistService(db)
+    playlists = await playlist_service.list_guild_playlists(guild_id)
+        
+    return [
+        {
+            **{c.name: getattr(p, c.name) for c in p.__table__.columns},
+            "track_count": getattr(p, 'track_count', 0),
+            "top_artworks": getattr(p, 'top_artworks', []),
+        }
+        for p in playlists
+    ]

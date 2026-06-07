@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { api } from '@/lib/api';
 import type { PlayerState, PlayerTrack, PlaylistSummary } from '@/lib/types';
 import { Icon } from '@/components/icons';
+import { toast } from 'sonner';
 import { useGuilds } from '@/context/GuildContext';
 import {
   DndContext,
@@ -139,7 +140,6 @@ export default function QueuePage() {
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [targetTrack, setTargetTrack] = useState<PlayerTrack | null>(null);
-  const [actionFeedback, setActionFeedback] = useState<string>('');
 
   useEffect(() => {
     api.get<PlaylistSummary[]>('/playlists').then((data) => {
@@ -211,10 +211,13 @@ export default function QueuePage() {
         source: track.source || (track as any).source || 'unknown',
         artwork_url: track.artwork_url || (track as any).artworkUrl || null,
       });
-      setActionFeedback('Added to Favorites');
-      setTimeout(() => setActionFeedback(''), 2000);
-    } catch (e: any) {
-      alert(`Failed to add to favorites: ${e.message || 'Unknown error'}`);
+      toast.success('Added to Favorites');
+    } catch (error: any) {
+      if (error.response?.status === 409 || error.response?.status === 400) {
+        toast.info('Already in Favorites');
+      } else {
+        toast.error(`Failed to add to favorites: ${error.message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -236,10 +239,13 @@ export default function QueuePage() {
         artwork_url: targetTrack.artwork_url || (targetTrack as any).artworkUrl || null,
       });
       setShowPlaylistMenu(false);
-      setActionFeedback('Added to Playlist');
-      setTimeout(() => setActionFeedback(''), 2000);
-    } catch {
-      alert('Failed to add to playlist');
+      toast.success('Added to Playlist');
+    } catch (error: any) {
+      if (error.response?.status === 409 || error.response?.status === 400) {
+        toast.info('Already in Playlist');
+      } else {
+        toast.error('Failed to add to playlist');
+      }
     }
   };
 
@@ -247,12 +253,6 @@ export default function QueuePage() {
 
   return (
     <div className="space-y-6 animate-slide-up relative pb-20">
-      {actionFeedback && (
-        <div className="fixed top-8 right-8 z-50 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-300 shadow-xl animate-fade-in">
-          {actionFeedback}
-        </div>
-      )}
-
       <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">Queue</h1>
       
       {!track && optimisticQueue.length === 0 ? (

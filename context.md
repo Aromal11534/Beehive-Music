@@ -51,8 +51,8 @@ A critical aspect of this system is how the Web UI controls the Discord Bot with
 
 1. **State Streaming (Bot -> Web):**
    - The Bot maintains the source of truth for the music player state.
-   - Every time the state changes (track starts, pauses, queue changes), the Bot publishes a JSON payload to Redis under the key `player_state:{guild_id}`.
-   - The FastAPI backend subscribes to this key and streams the state over an open WebSocket connection to the Next.js web client.
+   - Every time the state changes (track starts, pauses, queue changes), the Bot publishes a JSON payload to the Redis channel `player:{guild_id}` and stores the latest snapshot under `player_state:{guild_id}`.
+   - The FastAPI backend subscribes to `player:*`, normalizes the bot payload, and streams the state over an open WebSocket connection to the Next.js web client.
 
 2. **Remote Control (Web -> Bot):**
    - When a user clicks a button on the Web UI (e.g., Pause, Skip, Move Queue Item), the web client sends a JSON action payload through the WebSocket to the FastAPI backend.
@@ -65,13 +65,24 @@ A critical aspect of this system is how the Web UI controls the Discord Bot with
 
 - **Web UI Overhaul:** Upgraded the visual aesthetics of the Dashboard, Playlists, Favorites, and Queue pages to use a premium glass-morphism design with Tailwind.
 - **Queue Manipulation:** 
-  - Implemented `dnd-kit` in the web application to allow drag-and-drop reordering of tracks in the queue.
-  - Added backend bot support for `move`, `remove`, and `jump` actions over Redis Pub/Sub to sync the UI queue state with the Lavalink queue.
+   - Implemented `dnd-kit` in the web application to allow drag-and-drop reordering of tracks in the queue.
+   - Added backend bot support for `move`, `remove`, and `jump` actions over Redis Pub/Sub to sync the UI queue state with the Lavalink queue.
+   - Fixed a major Queue page bug where delete/reorder could make the UI show "Queue is empty" while the bot queue stayed unchanged. Root cause: the Queue page had a duplicate WebSocket with different URL handling from the global player context. Queue actions now use the shared `PlayerContext.sendCommand`, and the bot only publishes queue state after valid `remove`/`move` operations.
 - **Favorites System:** 
   - Created a Favorites page matching the Playlists aesthetic.
   - Added inline "Favorite" star buttons across the Queue and Now Playing pages, allowing one-click track saving.
 - **Playlist Management:** 
-  - Fixed payload schemas so tracks from the queue and now playing views can be properly appended to existing user playlists.
+   - Fixed payload schemas so tracks from the queue and now playing views can be properly appended to existing user playlists.
+
+---
+
+## Current Implementation Notes
+
+- The web dashboard is wrapped in `GuildProvider` and `PlayerProvider` in `apps/web/src/app/(dashboard)/layout.tsx`.
+- Player state and remote controls should be consumed through `apps/web/src/context/PlayerContext.tsx`.
+- Do not add page-specific player WebSocket connections unless there is a concrete reason. Duplicate sockets can drift from shared state and break queue controls.
+- Queue page remove/reorder lives in `apps/web/src/app/(dashboard)/queue/page.tsx` and sends `remove`, `move`, and `jump` commands through `sendCommand`.
+- Bot-side queue command handling lives in `apps/bot/src/index.ts` under the `web_command:*` Redis subscriber. Invalid `remove`/`move` indexes should not publish a new state snapshot.
 
 ---
 
