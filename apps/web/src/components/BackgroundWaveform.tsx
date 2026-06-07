@@ -12,7 +12,7 @@ export function BackgroundWaveform({ isPlaying, track }: { isPlaying: boolean; t
   if (!track) return null;
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 h-full max-h-32 flex items-end justify-between gap-[2px] px-2 md:px-6 opacity-10 pointer-events-none overflow-hidden z-0 mask-image-linear">
+    <div className="absolute bottom-0 left-0 right-0 h-full max-h-32 flex items-end justify-between gap-[2px] opacity-10 pointer-events-none overflow-hidden z-0 mask-image-linear">
       {bars.map(bar => (
         <div 
           key={bar.id}
