@@ -87,9 +87,6 @@ export function Icon({ name, className = 'h-5 w-5', ...props }: SVGProps<SVGSVGE
 
 export function BrandMark({ className = 'h-5 w-5' }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 3.5 19.4 8v8L12 20.5 4.6 16V8L12 3.5z" className="fill-zinc-950/20 stroke-current" strokeWidth="1.6" />
-      <path d="M8.5 9.2h7M8.5 12h7M8.5 14.8h7" className="stroke-current" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
+    <img src="/beehive.png" alt="Beehive Music Logo" className={`object-contain ${className}`} />
   );
 }
