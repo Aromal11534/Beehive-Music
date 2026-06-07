@@ -37,25 +37,28 @@ export default function ServerDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   const { state } = usePlayer();
-  const track = state?.current_track;
-  const isPlaying = !!(state && state.is_playing && !state.is_paused);
+  const isPlaying = !!(state && state.is_playing && !state.is_paused && state.guild_id === guild?.discord_guild_id);
+  const track = isPlaying ? state?.current_track : null;
 
   useEffect(() => {
     if (!guildId) return;
 
     async function loadData() {
       try {
-        const [guildData, statsData, historyData, settingsData] = await Promise.all([
-          api.get<Guild>(`/guilds/${guildId}`),
+        const guildData = await api.get<Guild>(`/guilds/${guildId}`);
+        setGuild(guildData);
+
+        // Load these independently so they don't break the page if backend isn't reloaded yet
+        Promise.allSettled([
           api.get<ServerStats>(`/guilds/${guildId}/stats`),
           api.get<TrackHistoryEntry[]>(`/history/guild/${guildId}?limit=20`),
           api.get<ServerSettings>(`/guilds/${guildId}/settings`),
-        ]);
+        ]).then(([statsRes, historyRes, settingsRes]) => {
+          if (statsRes.status === 'fulfilled') setStats(statsRes.value);
+          if (historyRes.status === 'fulfilled') setHistory(Array.isArray(historyRes.value) ? historyRes.value : []);
+          if (settingsRes.status === 'fulfilled') setSettings(settingsRes.value);
+        });
 
-        setGuild(guildData);
-        setStats(statsData);
-        setHistory(Array.isArray(historyData) ? historyData : []);
-        setSettings(settingsData);
       } catch (err: any) {
         console.error('Failed to load server data:', err);
         if (err.response?.status === 403) {
@@ -91,10 +94,10 @@ export default function ServerDashboardPage() {
   }
 
   const statCards = [
-    { label: 'Total Playbacks', value: stats?.total_playbacks ?? 0, icon: 'music' as const, color: 'from-blue-500 to-blue-600' },
-    { label: 'Total Playlists', value: stats?.total_playlists ?? 0, icon: 'list' as const, color: 'from-purple-500 to-purple-600' },
-    { label: 'Total Users', value: stats?.total_users ?? 0, icon: 'users' as const, color: 'from-emerald-500 to-emerald-600' },
-    { label: 'Commands Executed', value: stats?.total_commands ?? 0, icon: 'terminal' as const, color: 'from-amber-500 to-amber-600' },
+    { label: 'Total Playbacks', value: stats?.total_playbacks ?? 0, icon: 'music' as const, color: 'from-amber-500/20 to-amber-600/10' },
+    { label: 'Total Playlists', value: stats?.total_playlists ?? 0, icon: 'list' as const, color: 'from-blue-500/20 to-blue-600/10' },
+    { label: 'Total Users', value: stats?.total_users ?? 0, icon: 'users' as const, color: 'from-emerald-500/20 to-emerald-600/10' },
+    { label: 'Commands Executed', value: stats?.total_commands ?? 0, icon: 'terminal' as const, color: 'from-purple-500/20 to-purple-600/10' },
   ];
 
   return (
@@ -135,8 +138,8 @@ export default function ServerDashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((stat) => (
-          <div key={stat.label} className="glass-card p-4 hover:bg-black/40 transition-colors">
-            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-3 shadow-lg`}>
+          <div key={stat.label} className="rounded-2xl bg-black/25 p-4 ring-1 ring-white/10 transition-colors hover:bg-black/40 overflow-hidden">
+            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-3`}>
               <Icon name={stat.icon} className="h-5 w-5 text-white" />
             </div>
             <p className="text-3xl font-black text-white">{stat.value}</p>
