@@ -195,25 +195,16 @@ export default function SettingsPage() {
   const avatarUrl = avatarFilename ? `${getApiBase()}/avatars/${avatarFilename}` : null;
 
   return (
-    <div className="flex flex-1 flex-col min-h-0 animate-fade-in">
-      <div className="flex-1 min-h-0 overflow-hidden rounded-[28px] bg-black text-white shadow-2xl ring-1 ring-white/10 flex flex-col relative">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.24),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(39,39,42,0.55),_transparent_30%),linear-gradient(180deg,_#111111_0%,_#050505_42%,_#000_100%)] pointer-events-none" />
+    <div className="p-6 lg:p-10 w-full max-w-7xl mx-auto space-y-6 animate-fade-in">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-black text-zinc-100">Settings</h1>
+          <p className="mt-2 text-sm text-zinc-400">Manage your Beehive identity, security controls, active sessions, and default music preferences.</p>
+        </div>
+      </div>
 
-        <section className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px]">
-          <div className="relative overflow-hidden border-b border-white/10 bg-gradient-to-br from-[#3d1c04] via-[#201006] to-[#111111] p-5 md:p-8 shrink-0">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_10%,_rgba(251,191,36,0.16),_transparent_28%)] pointer-events-none" />
-            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-amber-300/80">Account Control</p>
-                <h1 className="mt-2 text-4xl font-black tracking-tight md:text-5xl">Settings</h1>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-300">Manage your Beehive identity, security controls, active sessions, and default music preferences.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-            <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-              <aside className="h-fit rounded-3xl bg-white/[0.04] p-3 ring-1 ring-white/10 backdrop-blur xl:sticky xl:top-0">
+      <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="h-fit glass-card p-3 xl:sticky xl:top-0">
                 <div className="px-3 py-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Sections</p>
                 </div>
@@ -252,7 +243,7 @@ export default function SettingsPage() {
 
                 {tab === 'profile' ? (
                   <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-                    <div className="rounded-3xl bg-[#181818] p-5 ring-1 ring-white/10 md:p-6">
+                    <div className="glass-card p-5 md:p-6">
                       <h3 className="text-lg font-black">Profile Details</h3>
                       <p className="mt-1 text-sm text-zinc-500">Update the name and email shown in the web panel.</p>
 
@@ -275,7 +266,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    <div className="rounded-3xl bg-white/[0.04] p-6 ring-1 ring-white/10 flex flex-col items-center justify-center text-center gap-4">
+                    <div className="glass-card p-6 flex flex-col items-center justify-center text-center gap-4">
                       <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 to-amber-600 text-5xl font-black text-zinc-950 shadow-2xl shadow-amber-500/20 overflow-hidden">
                         {avatarUrl ? (
                           <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
@@ -298,7 +289,7 @@ export default function SettingsPage() {
 
                 {tab === 'security' ? (
                   <div className="grid gap-5 lg:grid-cols-2">
-                    <div className="rounded-3xl bg-[#181818] p-5 ring-1 ring-white/10 md:p-6">
+                    <div className="glass-card p-5 md:p-6">
                       <h3 className="text-lg font-black">Change Password</h3>
                       <p className="mt-1 text-sm text-zinc-500">Use a strong password with at least 8 characters.</p>
                       <div className="mt-6 space-y-4">
@@ -310,7 +301,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    <div className="rounded-3xl bg-[#181818] p-5 ring-1 ring-white/10 md:p-6">
+                    <div className="glass-card p-5 md:p-6">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <h3 className="text-lg font-black">Two-Factor Authentication</h3>
@@ -325,7 +316,7 @@ export default function SettingsPage() {
                       </button>
                     </div>
 
-                    <div className="rounded-3xl bg-[#181818] p-5 ring-1 ring-white/10 lg:col-span-2 md:p-6">
+                    <div className="glass-card p-5 lg:col-span-2 md:p-6">
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <h3 className="text-lg font-black">Active Sessions</h3>
@@ -355,7 +346,7 @@ export default function SettingsPage() {
 
                 {tab === 'preferences' ? (
                   <div className="grid gap-5 lg:grid-cols-2">
-                    <div className="rounded-3xl bg-[#181818] p-5 ring-1 ring-white/10 md:p-6">
+                    <div className="glass-card p-5 md:p-6">
                       <h3 className="text-lg font-black">Playback Defaults</h3>
                       <p className="mt-1 text-sm text-zinc-500">Default preferences for future sessions.</p>
                       <label className="mt-6 block">
@@ -364,7 +355,7 @@ export default function SettingsPage() {
                       </label>
                     </div>
 
-                    <div className="rounded-3xl bg-white/[0.04] p-5 ring-1 ring-white/10 md:p-6">
+                    <div className="glass-card p-5 md:p-6">
                       <h3 className="text-lg font-black">More Controls</h3>
                       <p className="mt-2 text-sm leading-6 text-zinc-500">Server-specific playback defaults, notification preferences, and UI personalization can be added here when the API supports persisted preferences.</p>
                     </div>
@@ -372,9 +363,7 @@ export default function SettingsPage() {
                 ) : null}
               </main>
             </div>
-          </div>
-        </section>
-      </div>
+    </div>
 
       {isMfaModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
