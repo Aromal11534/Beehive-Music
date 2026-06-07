@@ -140,7 +140,7 @@ function PlaylistsContent() {
   const initialType = searchParams.get('type');
   const { state } = usePlayer();
   const track = state?.current_track;
-  const isPlaying = state && !state.paused;
+  const isPlaying = !!(state && state.is_playing && !state.is_paused);
   const queue = state?.queue || [];
 
   useEffect(() => {

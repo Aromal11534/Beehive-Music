@@ -137,7 +137,7 @@ export default function NowPlayingPage() {
           <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 lg:flex-row">
             <section className="min-h-0 flex-1 overflow-y-auto rounded-[22px] bg-[#121212]/90">
               <div className="relative overflow-hidden rounded-t-[22px] bg-gradient-to-br from-[#2d155f] via-[#211345] to-[#111111] p-4 md:p-6">
-                <BackgroundWaveform isPlaying={!!(state && !state.paused)} track={track} />
+                <BackgroundWaveform isPlaying={!!(state && state.is_playing && !state.is_paused)} track={track} />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,_rgba(132,90,223,0.3),_transparent_30%)] pointer-events-none" />
                 <div className="relative mt-2 grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-end">
                   <div>

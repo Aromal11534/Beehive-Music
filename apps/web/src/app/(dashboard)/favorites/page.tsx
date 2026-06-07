@@ -16,7 +16,7 @@ export default function FavoritesPage() {
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const { state } = usePlayer();
   const track = state?.current_track;
-  const isPlaying = state && !state.paused;
+  const isPlaying = !!(state && state.is_playing && !state.is_paused);
 
   useEffect(() => {
     loadFavorites();
