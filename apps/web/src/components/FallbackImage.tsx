@@ -52,7 +52,6 @@ export function FallbackImage({
         fill={fill} 
         className={`${className} transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`} 
         sizes={sizes}
-        loading="eager"
         onLoad={() => setLoading(false)}
         onError={() => {
           setError(true);
