@@ -19,9 +19,29 @@ export default function FavoritesPage() {
 
   const [shuffleEnabled, setShuffleEnabled] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importUrl, setImportUrl] = useState('');
+  const [importing, setImporting] = useState(false);
 
   const loadFavorites = () => {
     api.get<FavoriteTrack[]>('/favorites').then(setFavorites).catch(() => {});
+  };
+
+  const importFavorites = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importUrl.trim()) return;
+    setImporting(true);
+    
+    try {
+      const response = await api.post<FavoriteTrack[]>('/favorites/import', { url: importUrl });
+      setFavorites(response);
+      setImportUrl('');
+      setShowImportModal(false);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Failed to import tracks to favorites.");
+    } finally {
+      setImporting(false);
+    }
   };
 
   const removeFavorite = async (id: number, e: React.MouseEvent) => {
@@ -165,6 +185,13 @@ export default function FavoritesPage() {
                                   <Icon name="list-plus" className="w-4 h-4 text-amber-400" />
                                   Add to queue
                                 </button>
+                                <button 
+                                  onClick={() => { setShowImportModal(true); setShowDropdown(false); }}
+                                  className="w-full px-4 py-3 text-left text-sm text-zinc-200 hover:bg-white/5 rounded-xl flex items-center gap-3 transition-colors font-semibold"
+                                >
+                                  <Icon name="plus" className="w-4 h-4 text-amber-400" />
+                                  Import Tracks
+                                </button>
                               </div>
                             </div>
                           </>
@@ -222,6 +249,57 @@ export default function FavoritesPage() {
           </div>
         </div>
       </div>
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 pointer-events-auto animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget && !importing) setShowImportModal(false) }}>
+          <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-zinc-900 border border-white/10 shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(251,191,36,0.15),_transparent_80%)] pointer-events-none" />
+            
+            <div className="relative p-6 border-b border-white/5 flex justify-between items-start">
+              <div className="flex flex-col gap-1 pr-4">
+                <h3 className="text-xl font-black text-white">Import to Favorites</h3>
+                <p className="text-sm text-zinc-400">
+                  Paste a link from Spotify or YouTube Music.
+                </p>
+              </div>
+              <button disabled={importing} onClick={() => setShowImportModal(false)} className="p-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition shrink-0 disabled:opacity-50">
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="relative p-6">
+              <form onSubmit={importFavorites} className="space-y-6">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Playlist Link</label>
+                  <input
+                    type="url"
+                    value={importUrl}
+                    onChange={(e) => setImportUrl(e.target.value)}
+                    placeholder="https://open.spotify.com/playlist/..."
+                    className="w-full px-5 py-4 bg-black/40 border border-white/10 rounded-2xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition font-medium text-sm"
+                    autoFocus
+                    disabled={importing}
+                  />
+                </div>
+                <div className="flex gap-3 justify-end pt-4">
+                  <button type="button" disabled={importing} onClick={() => setShowImportModal(false)} className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-bold transition disabled:opacity-50">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={!importUrl.trim() || importing} className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-amber-950 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-sm font-bold transition shadow-lg shadow-amber-500/20 flex items-center gap-2">
+                    {importing ? (
+                      <>
+                        <Icon name="loader" className="w-4 h-4 animate-spin" />
+                        Importing...
+                      </>
+                    ) : 'Import Tracks'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
