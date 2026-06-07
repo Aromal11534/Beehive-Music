@@ -13,6 +13,7 @@ export interface User {
 export interface Guild {
   discord_guild_id?: string;
   name?: string;
+  icon_url?: string | null;
 }
 
 export interface GuildAccess {
