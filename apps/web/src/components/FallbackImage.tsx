@@ -46,6 +46,7 @@ export function FallbackImage({
         </div>
       )}
       <Image 
+        unoptimized
         src={src} 
         alt={alt} 
         fill={fill} 
