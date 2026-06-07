@@ -196,7 +196,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <div className="p-6 lg:p-10 w-full max-w-7xl mx-auto space-y-6 animate-fade-in">
+      <div className="space-y-6 animate-slide-up">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-3xl font-black text-zinc-100">Settings</h1>
