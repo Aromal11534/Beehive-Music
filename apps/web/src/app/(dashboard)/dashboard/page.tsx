@@ -66,7 +66,7 @@ export default function DashboardPage() {
                 {/* Stats Grid inside the banner to make it pop */}
                 <div className="relative mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {statCards.map((stat) => (
-                    <div key={stat.label} className="rounded-2xl bg-black/25 p-4 ring-1 ring-white/10 backdrop-blur transition-colors hover:bg-black/40 overflow-hidden transform-gpu">
+                    <div key={stat.label} className="rounded-2xl bg-black/25 p-4 ring-1 ring-white/10 transition-colors hover:bg-black/40 overflow-hidden">
                       <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-3`}>
                         <Icon name={stat.icon} className="h-5 w-5 text-white" />
                       </div>
