@@ -208,7 +208,7 @@ export default function NowPlayingPage() {
                 <section>
                   <div className="mb-6">
                     <p className="text-sm font-medium text-zinc-400">Made For</p>
-                    <h2 className="text-4xl font-black tracking-tight sm:text-5xl">{displayName}</h2>
+                    <h2 className="text-2xl font-bold tracking-tight text-white">{displayName}</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
                     {allSessionCards.map((card) => {
