@@ -17,6 +17,9 @@ export default function FavoritesPage() {
     loadFavorites();
   }, []);
 
+  const [shuffleEnabled, setShuffleEnabled] = useState(true);
+  const [showDropdown, setShowDropdown] = useState(false);
+
   const loadFavorites = () => {
     api.get<FavoriteTrack[]>('/favorites').then(setFavorites).catch(() => {});
   };
@@ -60,6 +63,42 @@ export default function FavoritesPage() {
     }
   };
 
+  const handlePlayFavorites = async (actionType: 'play' | 'queue') => {
+    if (!selectedGuild) return alert("Please select a server at the top right.");
+    if (favorites.length === 0) {
+      return alert("Your favorites list is empty.");
+    }
+    
+    let tracksToSend = [...favorites];
+    
+    if (shuffleEnabled) {
+      for (let i = tracksToSend.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [tracksToSend[i], tracksToSend[j]] = [tracksToSend[j], tracksToSend[i]];
+      }
+    }
+    
+    const mappedTracks = tracksToSend.map(t => ({
+      title: t.track_title,
+      author: t.track_author || 'Unknown Artist',
+      url: t.track_url,
+      identifier: t.track_url,
+      duration: t.duration_ms || 0,
+      artwork_url: t.artwork_url,
+      source: t.source || 'unknown',
+    }));
+    
+    try {
+      await api.post('/player/play', {
+        guild_id: selectedGuild,
+        tracks: mappedTracks,
+        action: actionType,
+      });
+    } catch {
+      alert("Failed to play favorites.");
+    }
+  };
+
   return (
     <div className="absolute top-6 bottom-6 left-6 right-6 flex justify-center pointer-events-none animate-fade-in">
       <div className="w-full max-w-[1800px] h-full pointer-events-auto overflow-hidden rounded-[28px] bg-black text-white shadow-2xl ring-1 ring-white/10 flex flex-col relative">
@@ -85,6 +124,52 @@ export default function FavoritesPage() {
                       {favorites.length} {favorites.length === 1 ? 'track' : 'tracks'} saved to your personal favorites.
                     </p>
                   </div>
+                  {favorites.length > 0 && (
+                    <div className="flex items-center gap-6 shrink-0 mt-4 md:mt-0 pb-2">
+                      <button 
+                        onClick={() => handlePlayFavorites('play')} 
+                        className="w-14 h-14 bg-amber-500 text-black rounded-full flex items-center justify-center hover:scale-105 hover:bg-amber-400 transition-transform shadow-xl shrink-0"
+                        title="Play"
+                      >
+                        <Icon name="play" className="w-6 h-6 fill-black ml-1" />
+                      </button>
+                      <button 
+                        onClick={() => setShuffleEnabled(!shuffleEnabled)} 
+                        className={`p-2 transition-all shrink-0 ${shuffleEnabled ? 'text-amber-500 hover:text-amber-400 hover:scale-105' : 'text-zinc-500 hover:text-zinc-400 hover:scale-105'}`}
+                        title={shuffleEnabled ? 'Disable Shuffle' : 'Enable Shuffle'}
+                      >
+                        <Icon name="shuffle" className="w-7 h-7" />
+                      </button>
+
+                      <div className="relative">
+                        <button 
+                          onClick={() => setShowDropdown(!showDropdown)}
+                          className="p-2 text-zinc-400 hover:text-white transition-colors shrink-0"
+                          title="More options"
+                        >
+                          <Icon name="more-horizontal" className="w-7 h-7" />
+                        </button>
+                        
+                        {showDropdown && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
+                            <div className="absolute top-full left-0 md:left-auto md:right-0 mt-2 w-48 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(251,191,36,0.15),_transparent_80%)] pointer-events-none" />
+                              <div className="relative p-1">
+                                <button 
+                                  onClick={() => { handlePlayFavorites('queue'); setShowDropdown(false); }}
+                                  className="w-full px-4 py-3 text-left text-sm text-zinc-200 hover:bg-white/5 rounded-xl flex items-center gap-3 transition-colors font-semibold"
+                                >
+                                  <Icon name="list-plus" className="w-4 h-4 text-amber-400" />
+                                  Add to queue
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
