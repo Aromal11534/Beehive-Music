@@ -67,7 +67,7 @@ export default function FavoritesPage() {
 
         <div className="relative z-10 flex flex-1 min-h-0 flex-col">
           <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
-            <section className="min-h-0 flex-1 overflow-y-auto rounded-[22px] bg-[#121212]/90 flex flex-col">
+            <section className="min-h-0 flex-1 overflow-y-auto rounded-[22px] bg-[#121212]/90">
               
               {/* Top Gradient Banner */}
               <div className="relative overflow-hidden rounded-t-[22px] shrink-0 bg-gradient-to-br from-[#78350f] via-[#451a03] to-[#111111] p-4 md:p-6 lg:p-8">
@@ -89,7 +89,7 @@ export default function FavoritesPage() {
               </div>
 
               {/* Main Content Area */}
-              <div className="p-4 md:p-6 lg:p-8 flex-1 min-h-0">
+              <div className="p-4 md:p-6 lg:p-8">
                 <div className="space-y-2">
                   {favorites.length > 0 ? (
                     favorites.map((t, i) => (

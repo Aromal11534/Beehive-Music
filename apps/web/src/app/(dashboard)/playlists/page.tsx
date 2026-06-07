@@ -278,7 +278,7 @@ function PlaylistsContent() {
 
         <div className="relative z-10 flex flex-1 min-h-0 flex-col">
           <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
-            <section className="min-h-0 flex-1 overflow-y-auto rounded-[22px] bg-[#121212]/90 flex flex-col relative">
+            <section className="min-h-0 flex-1 overflow-y-auto rounded-[22px] bg-[#121212]/90 relative">
               
               {/* Top Gradient Banner */}
               <div className="relative rounded-t-[22px] shrink-0 bg-gradient-to-br from-[#064e3b] via-[#022c22] to-[#111111] p-4 md:p-6 lg:p-8 z-10">
@@ -414,7 +414,7 @@ function PlaylistsContent() {
               </div>
 
               {/* Main Content Area */}
-              <div className="p-4 md:p-6 lg:p-8 flex-1 min-h-0 flex flex-col">
+              <div className="p-4 md:p-6 lg:p-8">
                 {!selectedPlaylist && (
                   <div className="relative flex items-center bg-black/60 p-1 rounded-full w-fit mb-6 ring-1 ring-white/10 shadow-inner">
                     <div 
@@ -436,7 +436,7 @@ function PlaylistsContent() {
                 )}
 
                 {selectedPlaylist ? (
-                  <div className="space-y-2 overflow-y-auto min-h-0">
+                  <div className="space-y-2">
                     {selectedPlaylist.tracks?.length > 0 ? (
                       selectedPlaylist.tracks.map((t, i) => (
                         <div key={t.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group">
@@ -475,7 +475,7 @@ function PlaylistsContent() {
                 ) : (
                   <>
                     {displayedPlaylists.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto min-h-0">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {displayedPlaylists.map((p) => (
                           <div key={p.id} onClick={() => {
                             setSelectedPlaylist({ id: p.id, name: p.name, playlist_type: p.playlist_type, tracks: [] } as unknown as PlaylistDetail);
