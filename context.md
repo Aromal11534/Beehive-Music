@@ -61,17 +61,19 @@ A critical aspect of this system is how the Web UI controls the Discord Bot with
    - FastAPI publishes it to a Redis channel named `web_command:{guild_id}`.
    - The Node.js Discord Bot subscribes to `web_command:*`. When it receives a command, it parses the action (e.g., `play`, `pause`, `remove`, `move`, `jump`, `shuffle`) and executes the corresponding method on its internal `MusicManager` or `QueueManager`.
 
-## Recent Development History
+## Recent Development History (Compacted)
 
-- **Web UI Overhaul:** Upgraded the visual aesthetics of the Dashboard, Playlists, Favorites, and Queue pages to use a premium glass-morphism design with Tailwind. Implemented `sonner` for elegant UI toast notifications.
+- **Premium UI Overhaul:** Upgraded the visual aesthetics of the Dashboard, Playlists, Favorites, and Queue pages to use a glass-morphism design with Tailwind. Implemented `sonner` for elegant UI toast notifications. Updated the core branding with a new logo and favicon.
 - **Queue Manipulation:** 
    - Implemented `dnd-kit` in the web application to allow drag-and-drop reordering.
    - Backend bot supports `move`, `remove`, and `jump` actions over Redis Pub/Sub.
 - **Spotify Imports & Dynamic Playlists:** 
-   - Created Python import logic to scrape Spotify metadata via scraping and Spotify Anon API, translating them directly to generic searchable tracks format.
-   - Implemented dynamic dashboard playlists (Daily Mix, etc.) generated on the fly.
+   - Created Python logic to scrape Spotify metadata and translate it to generic searchable tracks format.
+   - Users can now append tracks from external playlists (Spotify/YouTube Music) directly to existing Beehive playlists.
+   - Implemented dynamic dashboard playlists (Daily Mix, Quick Picks) generated on the fly.
 - **Favorites & Playlist Robustness:** 
-   - Proper backend checks for duplicate tracks (409 Conflict) elegantly handled by the UI.
+   - Proper backend checks for duplicate tracks (409 Conflict) handled elegantly. Deduplication is natively handled when appending to existing playlists.
+   - Implemented a resilient `FallbackImage` React component across the platform to smoothly catch broken/expired artwork URLs and display a fallback icon.
 
 ## Production Deployment & Anti-Bot Workarounds
 
