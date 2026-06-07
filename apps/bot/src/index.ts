@@ -26,6 +26,26 @@ declare module 'discord.js' {
   }
 }
 
+interface WebPlayableTrack {
+  encoded?: string;
+  title?: string;
+  author?: string;
+  url?: string;
+  identifier?: string;
+  duration?: number;
+  artwork_url?: string;
+  artworkUrl?: string;
+  source?: string;
+}
+
+interface WebPlayRequest {
+  guild_id?: string;
+  track?: WebPlayableTrack;
+  tracks?: WebPlayableTrack[];
+  action?: string;
+  user_discord_id?: string;
+}
+
 async function main() {
   console.log('🐝 Starting Beehive Bot...');
 
@@ -168,16 +188,18 @@ async function main() {
          }
         case 'remove': {
           const q = musicManager.getQueue(guildId);
-          if (typeof command.index === 'number') {
-            q.remove(command.index);
+          if (Number.isInteger(command.index)) {
+            const removed = q.remove(command.index);
+            if (!removed) break;
             await musicManager.publishState(guildId);
           }
           break;
         }
         case 'move': {
           const q = musicManager.getQueue(guildId);
-          if (typeof command.from === 'number' && typeof command.to === 'number') {
-            q.move(command.from, command.to);
+          if (Number.isInteger(command.from) && Number.isInteger(command.to)) {
+            const moved = q.move(command.from, command.to);
+            if (!moved) break;
             await musicManager.publishState(guildId);
           }
           break;
@@ -263,7 +285,7 @@ async function main() {
     redis.subscribe('web_play:request', async (message) => {
     try {
       console.log(`[WebPlay] Received play request`);
-      const data = JSON.parse(message);
+      const data = JSON.parse(message) as WebPlayRequest;
       const { guild_id, track, tracks, action, user_discord_id } = data;
       if (!guild_id || (!track && !tracks)) {
         console.error('[WebPlay] Missing guild_id or track(s)');
@@ -272,18 +294,18 @@ async function main() {
 
       const queue = musicManager.getQueue(guild_id);
 
-      const tracksToAdd = tracks || [track];
+      const tracksToAdd = Array.isArray(tracks) ? tracks : track ? [track] : [];
       if (tracksToAdd.length === 0) return;
 
-      const queueTracks: QueueTrack[] = tracksToAdd.map((t: any) => ({
+      const queueTracks: QueueTrack[] = tracksToAdd.map((t) => ({
         encoded: t.encoded,
-        title: t.title,
-        author: t.author,
-        url: t.url || t.identifier,
-        identifier: t.identifier,
-        duration: t.duration,
+        title: t.title || 'Unknown Track',
+        author: t.author || 'Unknown Artist',
+        url: t.url || t.identifier || '',
+        identifier: t.identifier || t.url || '',
+        duration: t.duration || 0,
         artworkUrl: t.artwork_url || t.artworkUrl,
-        source: t.source,
+        source: t.source || 'unknown',
         requestedBy: 'Web Panel',
         requestedById: user_discord_id,
       }));

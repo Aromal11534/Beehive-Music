@@ -3,7 +3,7 @@
  */
 
 import { Client } from 'discord.js';
-import { Shoukaku, Connectors, Player, type LavalinkResponse, type NodeOption } from 'shoukaku';
+import { Shoukaku, Connectors, Player, LoadType, type LavalinkResponse, type Node, type NodeOption, type Track } from 'shoukaku';
 import { config } from '../config';
 import { QueueManager } from './QueueManager';
 import { QueueTrack, GuildPlayerState } from '../types';
@@ -36,16 +36,7 @@ export class MusicManager {
       reconnectTries: 100,
       reconnectInterval: 5000,
       restTimeout: 60000,
-      nodeResolver: (nodes) => {
-        const connectedNodes = [...nodes.values()].filter(n => n.state === 1 /* CONNECTED */);
-        if (connectedNodes.length === 0) return undefined;
-        
-        const primaryNodes = connectedNodes.filter(n => n.group === 'primary');
-        if (primaryNodes.length > 0) {
-            return primaryNodes.sort((a, b) => a.penalties - b.penalties)[0];
-        }
-        return connectedNodes.sort((a, b) => a.penalties - b.penalties)[0];
-      }
+      nodeResolver: (nodes) => this.getConnectedNodes(nodes)[0]
     });
 
     this.shoukaku.on('ready', (name) => console.log(`[Lavalink] Node ${name} connected`));
@@ -55,7 +46,8 @@ export class MusicManager {
   }
 
   async connectLavalink(): Promise<void> {
-    if (this.shoukaku.getIdealNode()) return;
+    this.addMissingLavalinkNodes();
+    if (this.getConnectedNodes().length > 0) return;
 
     if (!this.connectPromise) {
       this.connectPromise = this.connectLavalinkWithRetry().finally(() => {
@@ -68,23 +60,7 @@ export class MusicManager {
 
   private async connectLavalinkWithRetry(): Promise<void> {
     for (let attempt = 1; attempt <= 30; attempt++) {
-      if (this.shoukaku.getIdealNode()) return;
-
-      const primaryNode = this.nodes.find(n => n.group === 'primary')!;
-      if (!this.shoukaku.nodes.has(primaryNode.name) && await this.isLavalinkHttpReady(primaryNode)) {
-          console.log(`[Lavalink] Adding primary node ${primaryNode.name}`);
-          this.shoukaku.addNode(primaryNode);
-      }
-
-      if (await this.waitForConnectedNode(3000)) return;
-
-      const publicNodes = this.nodes.filter(n => n.group === 'public');
-      for (const publicNode of publicNodes) {
-          if (!this.shoukaku.nodes.has(publicNode.name)) {
-              console.log(`[Lavalink] Adding fallback node ${publicNode.name}`);
-              this.shoukaku.addNode(publicNode);
-          }
-      }
+      this.addMissingLavalinkNodes();
 
       if (await this.waitForConnectedNode(3000)) return;
 
@@ -96,17 +72,49 @@ export class MusicManager {
     throw new Error('Lavalink nodes did not become available');
   }
 
-  private async isLavalinkHttpReady(node: NodeOption): Promise<boolean> {
-    try {
-      const scheme = node.secure ? 'https' : 'http';
-      const response = await fetch(`${scheme}://${node.url}/version`, {
-        headers: { Authorization: node.auth },
-        signal: AbortSignal.timeout(3000),
-      });
-      return response.ok;
-    } catch {
-      return false;
+  private addMissingLavalinkNodes(): void {
+    for (const node of this.nodes) {
+      if (!this.shoukaku.nodes.has(node.name)) {
+        console.log(`[Lavalink] Adding node ${node.name} (${node.group ?? 'default'})`);
+        this.shoukaku.addNode(node);
+      }
     }
+  }
+
+  private getConnectedNodes(nodes = this.shoukaku.nodes): Node[] {
+    return [...nodes.values()]
+      .filter((node) => node.state === 1 /* CONNECTED */)
+      .sort((a, b) => a.penalties - b.penalties);
+  }
+
+  private async resolveWithFallback(identifier: string): Promise<LavalinkResponse | undefined> {
+    await this.connectLavalink();
+
+    const nodes = this.getConnectedNodes();
+    if (nodes.length === 0) throw new Error('No Lavalink nodes available');
+
+    for (const node of nodes) {
+      try {
+        const result = await node.rest.resolve(identifier);
+        if (result && result.loadType !== LoadType.EMPTY && result.loadType !== LoadType.ERROR) {
+          return result;
+        }
+
+        console.warn(`[Lavalink] Node ${node.name} returned ${result?.loadType ?? 'no result'} for ${identifier}; trying next node`);
+      } catch (error) {
+        console.warn(`[Lavalink] Node ${node.name} failed to resolve ${identifier}; trying next node`, error);
+      }
+    }
+
+    return undefined;
+  }
+
+  private getFirstResolvedTrack(result: LavalinkResponse | undefined): Track | null {
+    if (!result) return null;
+    if (result.loadType === LoadType.TRACK) return result.data;
+    if (result.loadType === LoadType.SEARCH) return result.data[0] ?? null;
+    if (result.loadType === LoadType.PLAYLIST) return result.data.tracks[0] ?? null;
+    return null;
   }
 
   private async waitForConnectedNode(timeoutMs: number): Promise<boolean> {
@@ -183,15 +191,12 @@ export class MusicManager {
   async search(query: string, source: string = 'ytmsearch'): Promise<LavalinkResponse | undefined> {
     await this.connectLavalink();
 
-    const node = this.shoukaku.options.nodeResolver(this.shoukaku.nodes);
-    if (!node) throw new Error('No Lavalink nodes available');
-
     let searchQuery = query;
     if (!query.startsWith('http') && !query.includes(':')) {
       searchQuery = `${source}:${query}`;
     }
 
-    return node.rest.resolve(searchQuery);
+    return this.resolveWithFallback(searchQuery);
   }
 
   async playTrack(guildId: string, track: QueueTrack): Promise<void> {
@@ -219,7 +224,7 @@ export class MusicManager {
         track_identifier: track.identifier,
         source: track.source,
         duration_ms: track.duration,
-        requested_by_discord_id: (track as any).requestedById || null
+        requested_by_discord_id: track.requestedById || null
       };
       console.log(`[MusicManager] Publishing track_start:`, payload);
       await this.redis.publish("bot_event:track_start", JSON.stringify(payload));
@@ -236,16 +241,13 @@ export class MusicManager {
 
     await this.connectLavalink();
 
-    const node = this.shoukaku.options.nodeResolver(this.shoukaku.nodes);
-    if (!node) return;
-
     let resolveUrl = track.url;
     if (track.source === 'spotify' || (resolveUrl && resolveUrl.includes('spotify.com'))) {
       resolveUrl = `ytmsearch:${track.title} ${track.author}`;
     }
 
-    const result = await node.rest.resolve(resolveUrl);
-    const resolvedTrack = Array.isArray(result?.data) ? result.data[0] : result?.data;
+    const result = await this.resolveWithFallback(resolveUrl);
+    const resolvedTrack = this.getFirstResolvedTrack(result);
 
     if (resolvedTrack && 'encoded' in resolvedTrack && typeof resolvedTrack.encoded === 'string') {
       await player.setPaused(false);

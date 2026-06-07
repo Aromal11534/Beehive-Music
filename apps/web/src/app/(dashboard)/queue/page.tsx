@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { api } from '@/lib/api';
-import type { PlayerState, PlayerTrack, PlaylistSummary } from '@/lib/types';
+import type { PlayerTrack, PlaylistSummary } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import { toast } from 'sonner';
-import { useGuilds } from '@/context/GuildContext';
+import { usePlayer } from '@/context/PlayerContext';
 import {
   DndContext,
   closestCenter,
@@ -24,31 +24,6 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-
-const CONFIGURED_WS_URL = process.env.NEXT_PUBLIC_WS_URL || '/api/v1';
-
-function normalizeWsBase(base: string) {
-  const trimmed = base.replace(/\/$/, '');
-  return trimmed.endsWith('/ws') ? trimmed.replace(/\/ws$/, '/api/v1') : trimmed;
-}
-
-function getWsBase() {
-  const normalized = normalizeWsBase(CONFIGURED_WS_URL);
-
-  if (typeof window === 'undefined') return normalized;
-
-  if (normalized.startsWith('ws://') || normalized.startsWith('wss://')) {
-    return normalized;
-  }
-
-  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
-    return normalized.replace(/^http/, 'ws');
-  }
-
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const path = normalized.startsWith('/') ? normalized : `/${normalized}`;
-  return `${wsProtocol}://${window.location.host}${path}`;
-}
 
 function getTitle(t: PlayerTrack | null | undefined) {
   return t?.title || (t as any)?.track_title || 'Unknown Track';
@@ -132,10 +107,8 @@ function SortableQueueItem({
 }
 
 export default function QueuePage() {
-  const [state, setState] = useState<PlayerState | null>(null);
+  const { state, sendCommand } = usePlayer();
   const [optimisticQueue, setOptimisticQueue] = useState<PlayerTrack[]>([]);
-  const { selectedGuild } = useGuilds();
-  const wsRef = useRef<WebSocket | null>(null);
 
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
@@ -148,32 +121,8 @@ export default function QueuePage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedGuild) return;
-
-    api.get<PlayerState>(`/player/${selectedGuild}`).then((data) => {
-      setState(data);
-      setOptimisticQueue(data.queue || []);
-    }).catch(() => setState(null));
-
-    const wsUrl = getWsBase();
-    const wsToken = localStorage.getItem('beehive_access_token') || '';
-    const ws = new WebSocket(`${wsUrl}/player/ws/${selectedGuild}?token=${encodeURIComponent(wsToken)}`);
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as PlayerState;
-        setState(data);
-        setOptimisticQueue(data.queue || []);
-      } catch {}
-    };
-    wsRef.current = ws;
-    return () => { ws.close(); };
-  }, [selectedGuild]);
-
-  const sendCommand = useCallback((action: string, extras: any = {}) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ action, ...extras }));
-    }
-  }, []);
+    setOptimisticQueue(Array.isArray(state?.queue) ? state.queue : []);
+  }, [state?.queue]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -185,19 +134,28 @@ export default function QueuePage() {
     if (active.id !== over?.id && over) {
       const oldIndex = optimisticQueue.findIndex((_, i) => `track-${i}` === active.id);
       const newIndex = optimisticQueue.findIndex((_, i) => `track-${i}` === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
       
-      setOptimisticQueue((q) => arrayMove(q, oldIndex, newIndex));
-      sendCommand('move', { from: oldIndex, to: newIndex });
+      if (sendCommand('move', { from: oldIndex, to: newIndex })) {
+        setOptimisticQueue((q) => arrayMove(q, oldIndex, newIndex));
+      } else {
+        toast.error('Player connection is not ready. Try again in a moment.');
+      }
     }
   };
 
   const handleRemove = (index: number) => {
-    setOptimisticQueue((q) => q.filter((_, i) => i !== index));
-    sendCommand('remove', { index });
+    if (sendCommand('remove', { index })) {
+      setOptimisticQueue((q) => q.filter((_, i) => i !== index));
+    } else {
+      toast.error('Player connection is not ready. Try again in a moment.');
+    }
   };
 
   const handlePlayNow = (index: number) => {
-    sendCommand('jump', { index });
+    if (!sendCommand('jump', { index })) {
+      toast.error('Player connection is not ready. Try again in a moment.');
+    }
   };
 
   const handleAddFavorite = async (track: PlayerTrack) => {
