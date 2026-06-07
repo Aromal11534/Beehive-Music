@@ -206,9 +206,12 @@ export default function NowPlayingPage() {
                 </section>
 
                 <section>
-                  <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-xl font-black tracking-tight">Made for {displayName}</h2>
-                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Show all</span>
+                  <div className="mb-6 flex items-end justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-zinc-400">Made For</p>
+                      <h2 className="text-4xl font-black tracking-tight sm:text-5xl">{displayName}</h2>
+                    </div>
+                    <span className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400 cursor-pointer hover:text-white transition">Show all</span>
                   </div>
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
                     {allSessionCards.map((card) => {
@@ -274,7 +277,6 @@ export default function NowPlayingPage() {
             <aside className="hidden min-h-0 w-[320px] shrink-0 overflow-y-auto rounded-[22px] bg-[#181818] p-4 ring-1 ring-white/5 lg:block">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-sm font-black">{track ? 'Now Playing' : 'Player'}</h2>
-                <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-300">Live</span>
               </div>
 
               <div className="relative aspect-square overflow-hidden rounded-xl bg-zinc-900 shadow-2xl">
