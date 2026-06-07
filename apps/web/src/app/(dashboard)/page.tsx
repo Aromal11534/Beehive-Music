@@ -142,7 +142,7 @@ export default function NowPlayingPage() {
                   <div>
                     <div className="flex items-center gap-3">
                       <p className="text-sm font-semibold text-zinc-300">{selectedGuildName}</p>
-                      <Waveform isPlaying={playerState && !playerState.paused} track={track} />
+                      <Waveform isPlaying={!!(state && !state.paused)} track={track} />
                     </div>
                     <h1 className="mt-2 text-3xl font-black tracking-tight text-white md:text-5xl">{greeting}</h1>
                     <p className="mt-3 max-w-xl text-sm text-zinc-300">A private music room for this server, with live queue control and a focused player view.</p>
