@@ -7,11 +7,16 @@ import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
 import { FallbackImage } from '@/components/FallbackImage';
 import Image from 'next/image';
+import { Waveform } from '@/components/Waveform';
+import { usePlayer } from '@/context/PlayerContext';
 
 export default function FavoritesPage() {
   const [favorites, setFavorites] = useState<FavoriteTrack[]>([]);
   const { selectedGuild } = useGuilds();
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
+  const { state } = usePlayer();
+  const track = state?.current_track;
+  const isPlaying = state && !state.paused;
 
   useEffect(() => {
     loadFavorites();
@@ -136,9 +141,12 @@ export default function FavoritesPage() {
                 
                 <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-4">
                   <div>
-                    <p className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-                      <Icon name="star" className="w-4 h-4 text-amber-400" /> Your Favorites
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+                        <Icon name="star" className="w-4 h-4 text-amber-400" /> Your Favorites
+                      </p>
+                      <Waveform isPlaying={isPlaying} track={track} />
+                    </div>
                     <h1 className="mt-1 text-4xl font-black tracking-tight text-white md:text-5xl">
                       Liked Songs
                     </h1>

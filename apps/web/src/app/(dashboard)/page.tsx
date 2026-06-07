@@ -5,6 +5,7 @@ import Image from 'next/image';
 import type { PlayerTrack, PlaylistSummary } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
+import { Waveform } from '@/components/Waveform';
 import { usePlayer } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
@@ -139,7 +140,10 @@ export default function NowPlayingPage() {
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,_rgba(132,90,223,0.3),_transparent_30%)]" />
                 <div className="relative mt-2 grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-end">
                   <div>
-                    <p className="text-sm font-semibold text-zinc-300">{selectedGuildName}</p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-sm font-semibold text-zinc-300">{selectedGuildName}</p>
+                      <Waveform isPlaying={playerState && !playerState.paused} track={track} />
+                    </div>
                     <h1 className="mt-2 text-3xl font-black tracking-tight text-white md:text-5xl">{greeting}</h1>
                     <p className="mt-3 max-w-xl text-sm text-zinc-300">A private music room for this server, with live queue control and a focused player view.</p>
                   </div>

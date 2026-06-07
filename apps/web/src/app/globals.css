@@ -76,6 +76,21 @@ select:-webkit-autofill {
   animation: pulse-glow 3s ease-in-out infinite;
 }
 
+@keyframes wave {
+  0% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+  100% { transform: scaleY(0.3); }
+}
+
+.animate-wave {
+  animation: wave 1s ease-in-out infinite;
+  transform-origin: bottom;
+}
+
+.animation-paused {
+  animation-play-state: paused;
+}
+
 /* Glass card */
 .glass-card {
   background: rgba(39, 39, 42, 0.6);
