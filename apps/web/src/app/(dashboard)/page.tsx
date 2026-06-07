@@ -68,7 +68,7 @@ export default function NowPlayingPage() {
       try {
         const p = await api.get<PlaylistSummary[]>('/playlists');
         setPersonalPlaylists(p);
-      } catch {}
+      } catch { }
     }
     loadPersonalPlaylists();
   }, []);
@@ -206,12 +206,9 @@ export default function NowPlayingPage() {
                 </section>
 
                 <section>
-                  <div className="mb-6 flex items-end justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-zinc-400">Made For</p>
-                      <h2 className="text-4xl font-black tracking-tight sm:text-5xl">{displayName}</h2>
-                    </div>
-                    <span className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400 cursor-pointer hover:text-white transition">Show all</span>
+                  <div className="mb-6">
+                    <p className="text-sm font-medium text-zinc-400">Made For</p>
+                    <h2 className="text-4xl font-black tracking-tight sm:text-5xl">{displayName}</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
                     {allSessionCards.map((card) => {
