@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import type { GuildAccess, TrackHistoryEntry } from '@/lib/types';
 import { Icon, type IconName } from '@/components/icons';
+import { BackgroundWaveform } from '@/components/BackgroundWaveform';
+import { usePlayer } from '@/context/PlayerContext';
 
 interface DashboardStats {
   active_players: number;
@@ -14,6 +16,9 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const { state } = usePlayer();
+  const track = state?.current_track;
+  const isPlaying = !!(state && state.is_playing && !state.is_paused);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -55,7 +60,10 @@ export default function DashboardPage() {
               
               {/* Top Gradient Banner */}
               <div className="relative overflow-hidden rounded-t-[22px] bg-gradient-to-br from-[#3d1c04] via-[#210f04] to-[#111111] p-4 md:p-6 lg:p-8">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,_rgba(245,158,11,0.15),_transparent_30%)]" />
+                <div className="absolute inset-0 overflow-hidden rounded-t-[22px] pointer-events-none">
+                  <BackgroundWaveform isPlaying={isPlaying} track={track} />
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,_rgba(245,158,11,0.15),_transparent_30%)]" />
+                </div>
                 
                 <div className="relative">
                   <p className="text-sm font-semibold text-zinc-300">Overview</p>
