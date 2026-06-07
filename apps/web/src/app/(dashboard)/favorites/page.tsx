@@ -109,8 +109,10 @@ export default function FavoritesPage() {
             <section className="min-h-0 flex-1 overflow-y-auto rounded-[22px] bg-[#121212]/90">
               
               {/* Top Gradient Banner */}
-              <div className="relative overflow-hidden rounded-t-[22px] shrink-0 bg-gradient-to-br from-[#78350f] via-[#451a03] to-[#111111] p-4 md:p-6 lg:p-8">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,_rgba(251,191,36,0.15),_transparent_30%)]" />
+              <div className="relative rounded-t-[22px] shrink-0 bg-gradient-to-br from-[#78350f] via-[#451a03] to-[#111111] p-4 md:p-6 lg:p-8 z-10">
+                <div className="absolute inset-0 overflow-hidden rounded-t-[22px] pointer-events-none">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,_rgba(251,191,36,0.15),_transparent_30%)]" />
+                </div>
                 
                 <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-4">
                   <div>
