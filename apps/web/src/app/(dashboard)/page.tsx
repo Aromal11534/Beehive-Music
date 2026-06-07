@@ -5,7 +5,7 @@ import Image from 'next/image';
 import type { PlayerTrack, PlaylistSummary } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
-import { Waveform } from '@/components/Waveform';
+import { BackgroundWaveform } from '@/components/BackgroundWaveform';
 import { usePlayer } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
@@ -137,13 +137,11 @@ export default function NowPlayingPage() {
           <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 lg:flex-row">
             <section className="min-h-0 flex-1 overflow-y-auto rounded-[22px] bg-[#121212]/90">
               <div className="relative overflow-hidden rounded-t-[22px] bg-gradient-to-br from-[#2d155f] via-[#211345] to-[#111111] p-4 md:p-6">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,_rgba(132,90,223,0.3),_transparent_30%)]" />
+                <BackgroundWaveform isPlaying={!!(state && !state.paused)} track={track} />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,_rgba(132,90,223,0.3),_transparent_30%)] pointer-events-none" />
                 <div className="relative mt-2 grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-end">
                   <div>
-                    <div className="flex items-center gap-3">
-                      <p className="text-sm font-semibold text-zinc-300">{selectedGuildName}</p>
-                      <Waveform isPlaying={!!(state && !state.paused)} track={track} />
-                    </div>
+                    <p className="text-sm font-semibold text-zinc-300">{selectedGuildName}</p>
                     <h1 className="mt-2 text-3xl font-black tracking-tight text-white md:text-5xl">{greeting}</h1>
                     <p className="mt-3 max-w-xl text-sm text-zinc-300">A private music room for this server, with live queue control and a focused player view.</p>
                   </div>

@@ -7,7 +7,7 @@ import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
 import { FallbackImage } from '@/components/FallbackImage';
 import Image from 'next/image';
-import { Waveform } from '@/components/Waveform';
+import { BackgroundWaveform } from '@/components/BackgroundWaveform';
 import { usePlayer } from '@/context/PlayerContext';
 
 export default function FavoritesPage() {
@@ -136,17 +136,15 @@ export default function FavoritesPage() {
               {/* Top Gradient Banner */}
               <div className="relative rounded-t-[22px] shrink-0 bg-gradient-to-br from-[#78350f] via-[#451a03] to-[#111111] p-4 md:p-6 lg:p-8 z-10">
                 <div className="absolute inset-0 overflow-hidden rounded-t-[22px] pointer-events-none">
+                  <BackgroundWaveform isPlaying={isPlaying} track={track} />
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,_rgba(251,191,36,0.15),_transparent_30%)]" />
                 </div>
                 
                 <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-4">
                   <div>
-                    <div className="flex items-center gap-3">
-                      <p className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-                        <Icon name="star" className="w-4 h-4 text-amber-400" /> Your Favorites
-                      </p>
-                      <Waveform isPlaying={isPlaying} track={track} />
-                    </div>
+                    <p className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+                      <Icon name="star" className="w-4 h-4 text-amber-400" /> Your Favorites
+                    </p>
                     <h1 className="mt-1 text-4xl font-black tracking-tight text-white md:text-5xl">
                       Liked Songs
                     </h1>

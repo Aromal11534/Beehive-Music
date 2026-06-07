@@ -8,7 +8,7 @@ import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
 import { FallbackImage } from '@/components/FallbackImage';
 import { usePlayer } from '@/context/PlayerContext';
-import { Waveform } from '@/components/Waveform';
+import { BackgroundWaveform } from '@/components/BackgroundWaveform';
 
 function PlaylistsContent() {
   const [personalPlaylists, setPersonalPlaylists] = useState<PlaylistSummary[]>([]);
@@ -285,31 +285,26 @@ function PlaylistsContent() {
               {/* Top Gradient Banner */}
               <div className="relative rounded-t-[22px] shrink-0 bg-gradient-to-br from-[#064e3b] via-[#022c22] to-[#111111] p-4 md:p-6 lg:p-8 z-10">
                 <div className="absolute inset-0 overflow-hidden rounded-t-[22px] pointer-events-none">
+                  <BackgroundWaveform isPlaying={isPlaying} track={track} />
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,_rgba(16,185,129,0.15),_transparent_30%)]" />
                 </div>
                 
                 <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-4">
                   <div>
                     {selectedPlaylist ? (
-                      <div className="flex items-center gap-3 mb-2">
-                        <button onClick={() => { 
-                          setSelectedPlaylist(null); 
-                          if (initialType === 'dynamic') {
-                            router.push('/dashboard');
-                          } else {
-                            router.push('/playlists'); 
-                          }
-                        }} className="text-emerald-400 hover:text-emerald-300 flex items-center gap-2 text-sm font-semibold transition">
-                          <Icon name="arrow-left" className="w-4 h-4" /> 
-                          {initialType === 'dynamic' ? 'Back to Now Playing' : 'Back to Playlists'}
-                        </button>
-                        <Waveform isPlaying={isPlaying} track={track} />
-                      </div>
+                      <button onClick={() => { 
+                        setSelectedPlaylist(null); 
+                        if (initialType === 'dynamic') {
+                          router.push('/dashboard');
+                        } else {
+                          router.push('/playlists'); 
+                        }
+                      }} className="mb-2 text-emerald-400 hover:text-emerald-300 flex items-center gap-2 text-sm font-semibold transition">
+                        <Icon name="arrow-left" className="w-4 h-4" /> 
+                        {initialType === 'dynamic' ? 'Back to Now Playing' : 'Back to Playlists'}
+                      </button>
                     ) : (
-                      <div className="flex items-center gap-3">
-                        <p className="text-sm font-semibold text-zinc-300">Your Collection</p>
-                        <Waveform isPlaying={isPlaying} track={track} />
-                      </div>
+                      <p className="text-sm font-semibold text-zinc-300">Your Collection</p>
                     )}
                     <h1 className="mt-1 text-4xl font-black tracking-tight text-white md:text-5xl">
                       {selectedPlaylist ? selectedPlaylist.name : 'Playlists'}

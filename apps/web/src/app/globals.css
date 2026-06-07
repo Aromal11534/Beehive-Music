@@ -91,6 +91,11 @@ select:-webkit-autofill {
   animation-play-state: paused;
 }
 
+.mask-image-linear {
+  mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+}
+
 /* Glass card */
 .glass-card {
   background: rgba(39, 39, 42, 0.6);
