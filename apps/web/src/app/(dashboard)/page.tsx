@@ -161,8 +161,8 @@ export default function NowPlayingPage() {
 
               <div className="space-y-7 p-4 md:p-6">
                 <section>
-                  <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-xl font-black tracking-tight">Server Playlists</h2>
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-2xl font-bold tracking-tight text-white">Server Playlists</h2>
                     <Link href="/playlists" className="text-xs font-semibold uppercase tracking-wide text-zinc-400 hover:text-white transition">Show all</Link>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -206,9 +206,8 @@ export default function NowPlayingPage() {
                 </section>
 
                 <section>
-                  <div className="mb-6">
-                    <p className="text-sm font-medium text-zinc-400">Made For</p>
-                    <h2 className="text-4xl font-black tracking-tight sm:text-5xl">{displayName}</h2>
+                  <div className="mb-4">
+                    <h2 className="text-2xl font-bold tracking-tight text-white">Made for {displayName}</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
                     {allSessionCards.map((card) => {
