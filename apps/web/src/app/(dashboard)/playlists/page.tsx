@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import type { PlaylistSummary, PlaylistDetail, PlaylistTrack } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
-import Image from 'next/image';
+import { FallbackImage } from '@/components/FallbackImage';
 import { usePlayer } from '@/context/PlayerContext';
 
 function PlaylistsContent() {
@@ -442,11 +442,7 @@ function PlaylistsContent() {
                         <div key={t.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group">
                           <span className="w-6 text-center text-sm font-medium text-zinc-500 group-hover:text-white">{i + 1}</span>
                           <div className="w-12 h-12 rounded bg-zinc-800 shrink-0 overflow-hidden relative">
-                            {t.artwork_url ? (
-                              <Image unoptimized src={t.artwork_url} alt="" fill className="object-cover" sizes="48px" />
-                            ) : (
-                              <div className="flex h-full items-center justify-center text-emerald-500/50"><Icon name="music" className="h-5 w-5" /></div>
-                            )}
+                            <FallbackImage src={t.artwork_url} className="object-cover" sizes="48px" />
                           </div>
                           <div className="flex-1 min-w-0 pr-4">
                             <p className="text-sm font-semibold text-white truncate group-hover:text-emerald-400 transition">{t.track_title}</p>
@@ -490,14 +486,14 @@ function PlaylistsContent() {
                                 <div className={`w-full h-full ${p.top_artworks.length === 1 ? 'block' : 'grid grid-cols-2 grid-rows-2'}`}>
                                   {p.top_artworks.length === 1 ? (
                                     <div className="relative w-full h-full">
-                                      <Image unoptimized src={p.top_artworks[0]} alt="" fill className="object-cover" sizes="56px" />
+                                      <FallbackImage src={p.top_artworks[0]} className="object-cover" sizes="56px" />
                                     </div>
                                   ) : (
                                     Array.from({ length: 4 }).map((_, i) => {
                                       const artwork = p.top_artworks![i] || p.top_artworks![i % p.top_artworks!.length];
                                       return artwork ? (
                                         <div key={i} className="relative w-full h-full">
-                                          <Image unoptimized src={artwork} alt="" fill className="object-cover" sizes="28px" />
+                                          <FallbackImage src={artwork} className="object-cover" sizes="28px" />
                                         </div>
                                       ) : (
                                         <div key={i} className="bg-zinc-800 w-full h-full" />

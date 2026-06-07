@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import Image from 'next/image';
 import { toast } from 'sonner';
 import { usePlayer } from '@/context/PlayerContext';
+import { FallbackImage } from '@/components/FallbackImage';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
 import type { PlayerTrack, PlaylistSummary } from '@/lib/types';
@@ -102,8 +102,6 @@ export function GlobalPlayer() {
 
   const currentVolume = localVolume !== null ? localVolume : (state?.volume ?? 100);
 
-  // If no guild selected or no state fetched yet, we can either hide it or show a disabled state.
-  // Showing a disabled state with "Select Server" is better.
   if (!selectedGuild) return null;
 
   return (
@@ -111,14 +109,8 @@ export function GlobalPlayer() {
       <div className="grid items-center gap-4 lg:grid-cols-[minmax(0,280px)_minmax(320px,1fr)_minmax(0,280px)]">
         {/* Left: Track Info */}
         <div className="flex min-w-0 items-center gap-3">
-          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded bg-zinc-800">
-            {track?.artwork_url ? (
-              <Image unoptimized src={track.artwork_url} alt={currentTitle} fill className="object-cover" sizes="56px" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-zinc-500">
-                <Icon name="music" className="h-5 w-5" />
-              </div>
-            )}
+          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-zinc-800 shadow-md">
+            <FallbackImage src={track?.artwork_url || ''} className="object-cover" sizes="56px" />
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{track ? currentTitle : 'Nothing playing'}</p>

@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import type { FavoriteTrack } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
+import { FallbackImage } from '@/components/FallbackImage';
 import Image from 'next/image';
 
 export default function FavoritesPage() {
@@ -94,13 +95,9 @@ export default function FavoritesPage() {
                     favorites.map((t, i) => (
                       <div key={t.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group">
                         <span className="w-6 text-center text-sm font-medium text-zinc-500 group-hover:text-white">{i + 1}</span>
-                        <div className="w-12 h-12 rounded bg-zinc-800 shrink-0 overflow-hidden relative flex items-center justify-center text-amber-500/50">
-                          {t.artwork_url ? (
-                            <Image unoptimized src={t.artwork_url} alt="" fill className="object-cover" sizes="48px" />
-                          ) : (
-                            <Icon name="music" className="h-5 w-5" />
-                          )}
-                        </div>
+                          <div className="w-12 h-12 rounded bg-zinc-800 shrink-0 overflow-hidden relative">
+                            <FallbackImage src={t.artwork_url} className="object-cover" sizes="48px" />
+                          </div>
                         <div className="flex-1 min-w-0 pr-4">
                           <p className="text-sm font-semibold text-white truncate group-hover:text-amber-400 transition">{t.track_title}</p>
                           <p className="text-xs text-zinc-400 truncate mt-0.5">{t.track_author || 'Unknown Artist'}</p>

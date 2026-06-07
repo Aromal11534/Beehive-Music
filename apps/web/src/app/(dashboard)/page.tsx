@@ -9,6 +9,7 @@ import { usePlayer } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import Link from 'next/link';
+import { FallbackImage } from '@/components/FallbackImage';
 
 function getTrackTitle(track: PlayerTrack | null | undefined) {
   return track?.title || track?.track_title || 'Unknown Track';
@@ -146,11 +147,7 @@ export default function NowPlayingPage() {
                   <div className="rounded-2xl bg-black/25 p-3 ring-1 ring-white/10 backdrop-blur">
                     <div className="flex items-center gap-3">
                       <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-800">
-                        {track?.artwork_url ? (
-                          <Image unoptimized src={track.artwork_url} alt={currentTitle} fill className="object-cover" sizes="64px" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-amber-300"><Icon name="music" className="h-7 w-7" /></div>
-                        )}
+                        <FallbackImage src={track?.artwork_url} className="object-cover" sizes="64px" fallbackIcon="music" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400">Now Playing</p>
@@ -176,14 +173,14 @@ export default function NowPlayingPage() {
                             <div className={`w-full h-full ${p.top_artworks.length === 1 ? 'block' : 'grid grid-cols-2 grid-rows-2'}`}>
                               {p.top_artworks.length === 1 ? (
                                 <div className="relative w-full h-full">
-                                  <Image unoptimized src={p.top_artworks[0]} alt="" fill className="object-cover" sizes="48px" />
+                                  <FallbackImage src={p.top_artworks[0]} className="object-cover" sizes="48px" />
                                 </div>
                               ) : (
                                 Array.from({ length: 4 }).map((_, i) => {
                                   const artwork = p.top_artworks![i] || p.top_artworks![i % p.top_artworks!.length];
                                   return artwork ? (
                                     <div key={i} className="relative w-full h-full">
-                                      <Image unoptimized src={artwork} alt="" fill className="object-cover" sizes="24px" />
+                                      <FallbackImage src={artwork} className="object-cover" sizes="24px" />
                                     </div>
                                   ) : (
                                     <div key={i} className="bg-zinc-800 w-full h-full" />
@@ -222,14 +219,14 @@ export default function NowPlayingPage() {
                               <div className={`w-full h-full ${card.top_artworks.length === 1 ? 'block' : 'grid grid-cols-2 grid-rows-2'}`}>
                                 {card.top_artworks.length === 1 ? (
                                   <div className="relative w-full h-full">
-                                    <Image unoptimized src={card.top_artworks[0] || '/default-album.png'} alt="" fill className="object-cover" sizes="180px" />
+                                    <FallbackImage src={card.top_artworks[0] || '/default-album.png'} className="object-cover" sizes="180px" />
                                   </div>
                                 ) : (
                                   Array.from({ length: 4 }).map((_, i) => {
                                     const artwork = card.top_artworks![i] || card.top_artworks![i % card.top_artworks!.length];
                                     return artwork ? (
                                       <div key={i} className="relative w-full h-full">
-                                        <Image unoptimized src={artwork} alt="" fill className="object-cover" sizes="90px" />
+                                        <FallbackImage src={artwork} className="object-cover" sizes="90px" />
                                       </div>
                                     ) : (
                                       <div key={i} className="bg-zinc-800 w-full h-full" />
@@ -281,11 +278,7 @@ export default function NowPlayingPage() {
               </div>
 
               <div className="relative aspect-square overflow-hidden rounded-xl bg-zinc-900 shadow-2xl">
-                {track?.artwork_url ? (
-                  <Image unoptimized src={track.artwork_url} alt={currentTitle} fill className="object-cover" sizes="320px" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-900/60 to-zinc-900 text-amber-300"><Icon name="music" className="h-20 w-20" /></div>
-                )}
+                <FallbackImage src={track?.artwork_url} className="object-cover" sizes="320px" fallbackIcon="music" />
               </div>
 
               <div className="mt-4 flex items-start justify-between gap-3">
@@ -297,10 +290,8 @@ export default function NowPlayingPage() {
 
               <div className="relative mt-6 overflow-hidden rounded-xl bg-[#242424]">
                 <div className="relative h-32 bg-zinc-900">
-                  {track?.artwork_url ? (
-                    <Image unoptimized src={track.artwork_url} alt={currentAuthor} fill className="object-cover opacity-70 blur-[1px]" sizes="320px" />
-                  ) : null}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#242424] to-transparent" />
+                  <FallbackImage src={track?.artwork_url} className="object-cover opacity-70 blur-[1px]" sizes="320px" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#242424] via-[#242424]/80 to-transparent" />
                 </div>
                 <div className="p-4">
                   <p className="text-sm font-black">About the artist</p>
