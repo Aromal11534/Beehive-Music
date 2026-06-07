@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import Image from 'next/image';
+import { useState, useEffect, useRef } from 'react';
 import { Icon, type IconName } from '@/components/icons';
 
 interface FallbackImageProps {
@@ -23,9 +22,9 @@ export function FallbackImage({
 }: FallbackImageProps) {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const imgRef = useRef<HTMLImageElement>(null);
 
-  // YouTube's maxresdefault.jpg frequently 404s for non-1080p videos, causing long timeouts before falling back.
-  // We rewrite it to mqdefault.jpg (320x180) which is guaranteed to exist and loads blazing fast.
+  // YouTube's maxresdefault.jpg frequently 404s for non-1080p videos.
   const optimizedSrc = src?.replace('maxresdefault.jpg', 'mqdefault.jpg');
 
   // Reset state when the image source changes
@@ -33,6 +32,13 @@ export function FallbackImage({
     setError(false);
     setLoading(true);
   }, [src]);
+
+  // Check if image is already loaded from cache to prevent perpetual loading state
+  useEffect(() => {
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      setLoading(false);
+    }
+  }, [optimizedSrc]);
 
   if (!optimizedSrc || error) {
     return (
@@ -49,13 +55,12 @@ export function FallbackImage({
           <Icon name={fallbackIcon} className="h-1/2 w-1/2 opacity-30" />
         </div>
       )}
-      <Image 
-        unoptimized
+      <img 
+        ref={imgRef}
         src={optimizedSrc} 
         alt={alt} 
-        fill={fill} 
-        className={`${className} transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`} 
-        sizes={sizes}
+        loading="lazy"
+        className={`${className} transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'} ${fill ? 'absolute inset-0 w-full h-full' : ''}`} 
         onLoad={() => setLoading(false)}
         onError={() => {
           setError(true);
