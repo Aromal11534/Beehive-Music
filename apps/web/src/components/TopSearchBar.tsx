@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
+import { FallbackImage } from '@/components/FallbackImage';
 
 interface SearchTrack {
   encoded: string;
@@ -148,11 +149,11 @@ export function TopSearchBar() {
               {results.map((track, i) => (
                 <div key={`${track.identifier}-${i}`} className="flex items-center gap-3 p-2 hover:bg-zinc-800 rounded-lg group transition">
                   <div className="w-10 h-10 rounded bg-zinc-800 flex items-center justify-center shrink-0 overflow-hidden relative">
-                    {track.artwork_url ? (
-                      <img src={track.artwork_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <Icon name="music" className="h-4 w-4 text-amber-400" />
-                    )}
+                    <FallbackImage 
+                      src={track.artwork_url} 
+                      className="object-cover" 
+                      sizes="40px" 
+                    />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
                       <button onClick={() => handlePlay(track, 'play', i)} className="text-white hover:text-amber-400 transition" aria-label="Play">
                         <Icon name="play" className="h-5 w-5" />
