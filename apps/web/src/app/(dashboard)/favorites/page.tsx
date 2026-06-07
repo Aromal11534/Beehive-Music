@@ -203,7 +203,7 @@ export default function FavoritesPage() {
               </div>
 
               {/* Main Content Area */}
-              <div className="p-4 md:p-6 lg:p-8">
+              <div className="p-4 md:p-6 lg:p-8 pb-24 md:pb-32 lg:pb-32">
                 <div className="space-y-2">
                   {favorites.length > 0 ? (
                     favorites.map((t, i) => (

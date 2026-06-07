@@ -414,7 +414,7 @@ function PlaylistsContent() {
               </div>
 
               {/* Main Content Area */}
-              <div className="p-4 md:p-6 lg:p-8">
+              <div className="p-4 md:p-6 lg:p-8 pb-24 md:pb-32 lg:pb-32">
                 {!selectedPlaylist && (
                   <div className="relative flex items-center bg-black/60 p-1 rounded-full w-fit mb-6 ring-1 ring-white/10 shadow-inner">
                     <div 

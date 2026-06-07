@@ -159,7 +159,7 @@ export default function NowPlayingPage() {
                 </div>
               </div>
 
-              <div className="space-y-7 p-4 md:p-6">
+              <div className="space-y-7 p-4 md:p-6 pb-24 md:pb-32 lg:pb-32">
                 <section>
                   <div className="mb-3 flex items-center justify-between">
                     <h2 className="text-sm font-medium text-zinc-400">Server Playlists</h2>
