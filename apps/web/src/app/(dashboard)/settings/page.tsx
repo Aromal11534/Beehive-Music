@@ -216,10 +216,10 @@ export default function SettingsPage() {
                       <button
                         key={item.key}
                         onClick={() => { setTab(item.key); setMessage(''); }}
-                        className={`group w-full rounded-2xl p-4 text-left transition ${isActive ? 'bg-amber-400 text-zinc-950 shadow-lg shadow-amber-500/15' : 'text-zinc-300 hover:bg-white/8'}`}
+                        className={`group w-full rounded-2xl p-4 text-left transition ${isActive ? 'bg-white text-zinc-950 shadow-lg shadow-white/10' : 'text-zinc-300 hover:bg-white/8'}`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isActive ? 'bg-zinc-950/10' : 'bg-black/35 text-amber-300 group-hover:bg-black/55'}`}>
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isActive ? 'bg-zinc-950/10' : 'bg-black/35 text-zinc-400 group-hover:bg-black/55'}`}>
                             <Icon name={item.icon} className="h-4 w-4" />
                           </div>
                           <div className="min-w-0">
@@ -236,7 +236,7 @@ export default function SettingsPage() {
               <main className="min-w-0 space-y-5">
                 {message ? (
                   <div className="flex justify-end">
-                    <div className="shrink-0 rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-300">
+                    <div className="shrink-0 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-zinc-200">
                       {message}
                     </div>
                   </div>
@@ -251,7 +251,7 @@ export default function SettingsPage() {
                       <div className="mt-6 grid gap-5">
                         <label className="block">
                           <span className="text-sm font-medium text-zinc-400">Display Name</span>
-                          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="mt-2 w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-zinc-100 outline-none transition focus:border-amber-400/50 focus:ring-2 focus:ring-amber-400/10" />
+                          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="mt-2 w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-zinc-100 outline-none transition focus:border-white/50 focus:ring-2 focus:ring-white/10" />
                         </label>
 
                         <label className="block">
@@ -261,14 +261,14 @@ export default function SettingsPage() {
                       </div>
 
                       <div className="mt-6 flex flex-wrap gap-3">
-                        <button onClick={saveProfile} disabled={isSaving} className="rounded-full bg-amber-400 px-5 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60">
+                        <button onClick={saveProfile} disabled={isSaving} className="rounded-full bg-white px-5 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60">
                           {isSaving ? 'Saving...' : 'Save Profile'}
                         </button>
                       </div>
                     </div>
 
                     <div className="glass-card p-6 flex flex-col items-center justify-center text-center gap-4">
-                      <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 to-amber-600 text-5xl font-black text-zinc-950 shadow-2xl shadow-amber-500/20 overflow-hidden">
+                      <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-zinc-800 text-5xl font-black text-zinc-400 shadow-2xl shadow-black/20 overflow-hidden">
                         {avatarUrl ? (
                           <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                         ) : (
@@ -294,9 +294,9 @@ export default function SettingsPage() {
                       <h3 className="text-lg font-black">Change Password</h3>
                       <p className="mt-1 text-sm text-zinc-500">Use a strong password with at least 8 characters.</p>
                       <div className="mt-6 space-y-4">
-                        <input type="password" placeholder="Current password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-amber-400/50 focus:ring-2 focus:ring-amber-400/10" />
-                        <input type="password" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-amber-400/50 focus:ring-2 focus:ring-amber-400/10" />
-                        <button onClick={changePassword} disabled={isSaving || !currentPassword || !newPassword} className="rounded-full bg-amber-400 px-5 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60">
+                        <input type="password" placeholder="Current password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-white/50 focus:ring-2 focus:ring-white/10" />
+                        <input type="password" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-white/50 focus:ring-2 focus:ring-white/10" />
+                        <button onClick={changePassword} disabled={isSaving || !currentPassword || !newPassword} className="rounded-full bg-white px-5 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60">
                           Change Password
                         </button>
                       </div>
@@ -352,7 +352,7 @@ export default function SettingsPage() {
                       <p className="mt-1 text-sm text-zinc-500">Default preferences for future sessions.</p>
                       <label className="mt-6 block">
                         <span className="text-sm font-medium text-zinc-400">Default Volume</span>
-                        <input type="range" min="0" max="100" defaultValue="80" className="mt-4 w-full accent-amber-400" />
+                        <input type="range" min="0" max="100" defaultValue="80" className="mt-4 w-full accent-white" />
                       </label>
                     </div>
 
@@ -392,11 +392,11 @@ export default function SettingsPage() {
                     value={mfaCode}
                     onChange={(e) => setMfaCode(e.target.value)}
                     maxLength={6}
-                    className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-center text-xl tracking-[0.5em] text-zinc-100 outline-none transition focus:border-amber-400/50"
+                    className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-center text-xl tracking-[0.5em] text-zinc-100 outline-none transition focus:border-white/50"
                   />
                   <div className="flex gap-3 mt-6">
                     <button onClick={closeMfaModal} className="flex-1 rounded-full bg-white/10 px-5 py-2.5 text-sm font-black text-zinc-300 transition hover:bg-white/15">Cancel</button>
-                    <button onClick={enableMfa} disabled={isSaving || mfaCode.length !== 6} className="flex-1 rounded-full bg-amber-400 px-5 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-amber-300 disabled:opacity-50">Verify</button>
+                    <button onClick={enableMfa} disabled={isSaving || mfaCode.length !== 6} className="flex-1 rounded-full bg-white px-5 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-zinc-200 disabled:opacity-50">Verify</button>
                   </div>
                 </div>
               )}
@@ -412,7 +412,7 @@ export default function SettingsPage() {
                       <code key={code} className="text-sm text-zinc-300 font-mono text-center">{code}</code>
                     ))}
                   </div>
-                  <button onClick={closeMfaModal} className="w-full mt-4 rounded-full bg-amber-400 px-5 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-amber-300">I have saved them</button>
+                  <button onClick={closeMfaModal} className="w-full mt-4 rounded-full bg-white px-5 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-zinc-200">I have saved them</button>
                 </div>
               )}
 
@@ -424,7 +424,7 @@ export default function SettingsPage() {
                     placeholder="Password"
                     value={mfaPassword}
                     onChange={(e) => setMfaPassword(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-zinc-100 outline-none transition focus:border-amber-400/50"
+                    className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-zinc-100 outline-none transition focus:border-white/50"
                   />
                   <input
                     type="text"
@@ -432,7 +432,7 @@ export default function SettingsPage() {
                     value={mfaCode}
                     onChange={(e) => setMfaCode(e.target.value)}
                     maxLength={6}
-                    className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-center text-xl tracking-[0.5em] text-zinc-100 outline-none transition focus:border-amber-400/50"
+                    className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-center text-xl tracking-[0.5em] text-zinc-100 outline-none transition focus:border-white/50"
                   />
                   <div className="flex gap-3 mt-6">
                     <button onClick={closeMfaModal} className="flex-1 rounded-full bg-white/10 px-5 py-2.5 text-sm font-black text-zinc-300 transition hover:bg-white/15">Cancel</button>
@@ -463,7 +463,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex gap-3">
               <button onClick={() => { setCropModalOpen(false); setImageToCrop(null); }} className="flex-1 rounded-full bg-white/10 px-5 py-2.5 text-sm font-black text-zinc-300 transition hover:bg-white/15">Cancel</button>
-              <button onClick={uploadCroppedAvatar} disabled={isSaving} className="flex-1 rounded-full bg-amber-400 px-5 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-amber-300 disabled:opacity-50">Upload</button>
+              <button onClick={uploadCroppedAvatar} disabled={isSaving} className="flex-1 rounded-full bg-white px-5 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-zinc-200 disabled:opacity-50">Upload</button>
             </div>
           </div>
         </div>
