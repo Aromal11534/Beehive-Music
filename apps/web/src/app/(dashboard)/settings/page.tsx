@@ -199,8 +199,8 @@ export default function SettingsPage() {
       <div className="space-y-6 animate-slide-up">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-black text-zinc-100">Settings</h1>
-          <p className="mt-2 text-sm text-zinc-400">Manage your Beehive identity, security controls, active sessions, and default music preferences.</p>
+          <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">Settings</h1>
+          <p className="text-sm text-zinc-500 mt-1">Manage your Beehive identity, security controls, active sessions, and default music preferences.</p>
         </div>
       </div>
 
