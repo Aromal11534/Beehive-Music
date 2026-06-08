@@ -337,9 +337,12 @@ async function main() {
             }
 
             if (vcId) {
+              await musicManager.joinChannel(guild_id, vcId);
+              queue.current = first;
               await musicManager.playTrack(guild_id, first);
             } else {
               queue.addNext(first); // put it back
+              console.warn(`[WebPlay] Auto-start aborted: Could not find a suitable voice channel in guild ${guild_id}`);
               await musicManager.publishState(guild_id);
             }
           } else {
