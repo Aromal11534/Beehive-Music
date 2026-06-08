@@ -84,7 +84,11 @@ export class MusicManager {
   private getConnectedNodes(nodes = this.shoukaku.nodes): Node[] {
     return [...nodes.values()]
       .filter((node) => node.state === 1 /* CONNECTED */)
-      .sort((a, b) => a.penalties - b.penalties);
+      .sort((a, b) => {
+        if (a.group === 'primary' && b.group !== 'primary') return -1;
+        if (b.group === 'primary' && a.group !== 'primary') return 1;
+        return a.penalties - b.penalties;
+      });
   }
 
   private async resolveWithFallback(identifier: string): Promise<LavalinkResponse | undefined> {
