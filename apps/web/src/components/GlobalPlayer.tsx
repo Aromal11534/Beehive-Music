@@ -59,11 +59,11 @@ export function GlobalPlayer() {
       await api.post('/favorites', {
         track_title: currentTitle || 'Unknown Title',
         track_author: currentAuthor || 'Unknown Artist',
-        track_url: (track as any).track_url || track.url || track.identifier || 'unknown',
-        track_identifier: track.identifier || (track as any).track_identifier || null,
+        track_url: track.track_url || track.url || track.identifier || 'unknown',
+        track_identifier: track.identifier || track.track_identifier || null,
         duration_ms: duration || 0,
-        source: track.source || (track as any).source || 'unknown',
-        artwork_url: track.artwork_url || (track as any).artworkUrl || null,
+        source: track.source || 'unknown',
+        artwork_url: track.artwork_url || track.artworkUrl || null,
       });
       showActionFeedback('Added to Favorites');
     } catch (error: any) {
@@ -82,11 +82,11 @@ export function GlobalPlayer() {
       await api.post(`/playlists/${playlistId}/tracks`, {
         track_title: currentTitle || 'Unknown Title',
         track_author: currentAuthor || 'Unknown Artist',
-        track_url: (track as any).track_url || track.url || track.identifier || 'unknown',
-        track_identifier: track.identifier || (track as any).track_identifier || null,
+        track_url: track.track_url || track.url || track.identifier || 'unknown',
+        track_identifier: track.identifier || track.track_identifier || null,
         duration_ms: track.duration_ms || track.duration || duration || 0,
-        source: track.source || (track as any).source || 'unknown',
-        artwork_url: track.artwork_url || (track as any).artworkUrl || null,
+        source: track.source || 'unknown',
+        artwork_url: track.artwork_url || track.artworkUrl || null,
       });
       setShowPlaylistMenu(false);
       showActionFeedback('Added to Playlist');

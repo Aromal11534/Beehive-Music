@@ -12,10 +12,10 @@ import { usePlayer } from '@/context/PlayerContext';
 import { FastAverageColor } from 'fast-average-color';
 
 interface ServerStats {
-  total_playbacks: int;
-  total_playlists: int;
-  total_users: int;
-  total_commands: int;
+  total_playbacks: number;
+  total_playlists: number;
+  total_users: number;
+  total_commands: number;
 }
 
 interface ServerSettings {
@@ -113,7 +113,7 @@ export default function ServerDashboardPage() {
     <div className="space-y-6 animate-slide-up relative pb-20">
       {/* Back button */}
       <Link href="/servers" className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors">
-        <Icon name="chevron-left" className="w-4 h-4" />
+        <Icon name="arrow-left" className="w-4 h-4" />
         Back to Servers
       </Link>
 

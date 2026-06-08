@@ -184,14 +184,10 @@ async function main() {
             console.warn(`[WebCommand] Leave rejected: no user_id provided for guild ${guildId}`);
             break;
           }
-           const guild = client.guilds.cache.get(guildId);
-           if (guild) {
-              console.log(`[WebCommand] Leaving guild ${guild.name} (${guildId}) as requested by user ${command.user_id}.`);
-              await musicManager.disconnect(guildId);
-              await guild.leave();
-           }
-           break;
-         }
+          console.log(`[WebCommand] Disconnecting from voice in guild ${guildId} as requested by user ${command.user_id}.`);
+          await musicManager.disconnect(guildId);
+          break;
+        }
         case 'remove': {
           const q = musicManager.getQueue(guildId);
           if (Number.isInteger(command.index)) {
@@ -288,7 +284,7 @@ async function main() {
     }
   });
 
-    redis.subscribe('web_play:request', async (message) => {
+  redis.subscribe('web_play:request', async (message) => {
     try {
       console.log(`[WebPlay] Received play request`);
       const data = JSON.parse(message) as WebPlayRequest;

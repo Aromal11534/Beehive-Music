@@ -63,7 +63,8 @@ function PlaylistsContent() {
 
   useEffect(() => {
     loadPlaylists();
-  }, [selectedGuild, guilds]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGuild, guilds.length]);
 
   const createPlaylist = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,6 +146,7 @@ function PlaylistsContent() {
 
   useEffect(() => {
     if (initialType === 'dynamic' && initialId && initialName) {
+      // For dynamic playlists, build from current player state once
       const featuredTracks = track ? [track, ...queue].slice(0, 6) : queue.slice(0, 6);
       let tracksData: any[] = [];
       
@@ -180,7 +182,8 @@ function PlaylistsContent() {
     } else {
       setSelectedPlaylist(null);
     }
-  }, [initialId, initialName, initialType, track, queue]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialId, initialName, initialType]);
 
   const formatDuration = (ms: number) => {
     const s = Math.floor(ms / 1000);

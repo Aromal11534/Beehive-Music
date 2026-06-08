@@ -24,8 +24,10 @@ export interface GuildAccess {
 }
 
 export interface TrackHistoryEntry {
+  id: number;
   track_title: string;
   track_author?: string | null;
+  artwork_url?: string | null;
   played_at: string;
 }
 
@@ -74,11 +76,14 @@ export interface PlayerTrack {
   author?: string;
   track_author?: string;
   artwork_url?: string;
+  artworkUrl?: string;
   duration?: number;
   duration_ms?: number;
   url?: string;
   identifier?: string;
   source?: string;
+  track_url?: string;
+  track_identifier?: string;
 }
 
 export interface PlayerState {

@@ -80,22 +80,37 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setLocalPosition(data?.position_ms || 0);
     }).catch(() => setState(null));
 
-    const wsUrl = getWsBase();
-    const wsToken = localStorage.getItem('beehive_access_token') || '';
-    const ws = new WebSocket(`${wsUrl}/player/ws/${selectedGuild}?token=${encodeURIComponent(wsToken)}`);
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as PlayerState;
-        setState(data);
-        positionRef.current = data.position_ms || 0;
-        lastUpdateRef.current = performance.now();
-      } catch {}
-    };
-    ws.onerror = () => {};
-    ws.onclose = () => {};
-    wsRef.current = ws;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let closed = false;
 
-    return () => { ws.close(); };
+    function connectWs() {
+      const wsUrl = getWsBase();
+      const wsToken = localStorage.getItem('beehive_access_token') || '';
+      const ws = new WebSocket(`${wsUrl}/player/ws/${selectedGuild}?token=${encodeURIComponent(wsToken)}`);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as PlayerState;
+          setState(data);
+          positionRef.current = data.position_ms || 0;
+          lastUpdateRef.current = performance.now();
+        } catch {}
+      };
+      ws.onerror = () => {};
+      ws.onclose = () => {
+        if (!closed) {
+          reconnectTimeout = setTimeout(connectWs, 3000);
+        }
+      };
+      wsRef.current = ws;
+    }
+
+    connectWs();
+
+    return () => {
+      closed = true;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      wsRef.current?.close();
+    };
   }, [selectedGuild]);
 
   const sendCommand = useCallback((action: string, value?: string | number | boolean | Record<string, unknown>) => {
@@ -106,6 +121,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           ? { action, value }
           : { action };
       wsRef.current.send(JSON.stringify(payload));
+
+      // Optimistic UI updates
+      setState((prev) => {
+        if (!prev) return prev;
+        switch (action) {
+          case 'pause': return { ...prev, is_playing: false, is_paused: true };
+          case 'resume': return { ...prev, is_playing: true, is_paused: false };
+          case 'volume': return { ...prev, volume: value as number };
+          case 'loop': return { ...prev, loop_mode: value as string };
+          default: return prev;
+        }
+      });
+
       return true;
     }
     return false;
@@ -120,12 +148,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [sendCommand]);
 
   const handleVolumeChange = useCallback((vol: number) => {
+    // Optimistic update handled inside sendCommand, so just debounce the command
     setState((prev) => prev ? { ...prev, volume: vol } : prev);
     if (volumeTimeoutRef.current) clearTimeout(volumeTimeoutRef.current);
     volumeTimeoutRef.current = setTimeout(() => {
-      sendCommand('volume', vol);
+      // Skip optimistic update for volume here since we already did it above
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ action: 'volume', value: vol }));
+      }
     }, 150);
-  }, [sendCommand]);
+  }, []);
 
   return (
     <PlayerContext.Provider
