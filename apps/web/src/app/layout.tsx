@@ -9,16 +9,13 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Beehive | Discord Music Control Panel",
   description: "Premium Discord music bot control panel with advanced playback controls, playlists, and server management.",
-  icons: {
-    icon: "/beehive.png",
-  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
       <head>
-        <link rel="icon" href="/beehive.png" type="image/png" sizes="any" />
+        <link rel="icon" href="/favicon.ico?v=5" type="image/x-icon" sizes="any" />
       </head>
       <body className={`${inter.className} bg-zinc-950 text-zinc-100 antialiased`}>
         <AuthProvider>

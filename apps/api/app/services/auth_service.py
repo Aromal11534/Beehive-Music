@@ -42,9 +42,12 @@ class AuthService:
         if await redis_client.exists(lockout_key):
             raise AccountLockedError()
 
+        from sqlalchemy import or_
         # Fetch user
         result = await self.db.execute(
-            select(User).options(selectinload(User.mfa)).where(User.username == username)
+            select(User).options(selectinload(User.mfa)).where(
+                or_(User.username == username, User.email == username)
+            )
         )
         user = result.scalar_one_or_none()
 

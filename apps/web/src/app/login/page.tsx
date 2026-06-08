@@ -419,7 +419,7 @@ function LoginContent() {
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div>
                       <label htmlFor="username" className="block text-sm font-medium text-zinc-400 mb-1.5">
-                        Username
+                        Username or Email
                       </label>
                       <input
                         id="username"
@@ -427,7 +427,7 @@ function LoginContent() {
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         className={inputClass}
-                        placeholder="Enter your username"
+                        placeholder="Enter your username or email"
                         required
                         autoFocus
                       />
