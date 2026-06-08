@@ -169,6 +169,12 @@ async function main() {
           await musicManager.publishState(guildId);
           break;
         }
+        case 'clear': {
+          const q = musicManager.getQueue(guildId);
+          q.clear();
+          await musicManager.publishState(guildId);
+          break;
+        }
         case 'stop':
           await musicManager.stop(guildId);
           break;
