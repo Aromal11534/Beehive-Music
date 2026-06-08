@@ -312,7 +312,42 @@ async function main() {
 
       if (action === 'queue') {
         queue.addMany(queueTracks);
-        await musicManager.publishState(guild_id);
+        const state = musicManager.getState(guild_id);
+        
+        // If the bot isn't playing anything, auto-start playback
+        if (!state.currentTrack && !state.isPlaying) {
+          const first = queue.next();
+          if (first) {
+            const guild = client.guilds.cache.get(guild_id);
+            let vcId: string | undefined;
+
+            if (guild) {
+              if (user_discord_id) {
+                try {
+                  const member = await guild.members.fetch(user_discord_id).catch(() => null);
+                  if (member?.voice.channel) {
+                    vcId = member.voice.channel.id;
+                  }
+                } catch {}
+              }
+              if (!vcId) {
+                const vc = guild.channels.cache.find((ch) => ch.isVoiceBased() && ch.members.size > 0);
+                if (vc) vcId = vc.id;
+              }
+            }
+
+            if (vcId) {
+              await musicManager.playTrack(guild_id, first);
+            } else {
+              queue.addNext(first); // put it back
+              await musicManager.publishState(guild_id);
+            }
+          } else {
+            await musicManager.publishState(guild_id);
+          }
+        } else {
+          await musicManager.publishState(guild_id);
+        }
       } else {
         // Play now
         queue.clear();
