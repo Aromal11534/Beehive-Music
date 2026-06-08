@@ -25,12 +25,12 @@ function PlaylistsContent() {
   const { guilds, selectedGuild } = useGuilds();
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const [shuffleEnabled, setShuffleEnabled] = useState(true);
-  
+
   const searchParams = useSearchParams();
   const router = useRouter();
   const initialId = searchParams.get('id');
   const initialName = searchParams.get('name');
-  
+
   const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistDetail | null>(
     initialId && initialName ? {
       id: Number(initialId),
@@ -44,7 +44,7 @@ function PlaylistsContent() {
     try {
       const p = await api.get<PlaylistSummary[]>('/playlists');
       setPersonalPlaylists(p);
-    } catch {}
+    } catch { }
 
     if (selectedGuild) {
       const g = guilds.find(g => g.guild?.discord_guild_id === selectedGuild);
@@ -52,7 +52,7 @@ function PlaylistsContent() {
         try {
           const s = await api.get<PlaylistSummary[]>(`/guilds/${g.guild_id}/playlists`);
           setServerPlaylists(s);
-        } catch {}
+        } catch { }
       } else {
         setServerPlaylists([]);
       }
@@ -63,8 +63,7 @@ function PlaylistsContent() {
 
   useEffect(() => {
     loadPlaylists();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGuild, guilds.length]);
+  }, [selectedGuild, guilds]);
 
   const createPlaylist = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +94,7 @@ function PlaylistsContent() {
     e.preventDefault();
     if (!importUrl.trim()) return;
     setImporting(true);
-    
+
     try {
       let p;
       if (selectedPlaylist && typeof selectedPlaylist.id === 'number') {
@@ -113,12 +112,12 @@ function PlaylistsContent() {
         }
         p = await api.post<PlaylistDetail>('/playlists/import', payload);
       }
-      
+
       setImportUrl('');
       setShowImportModal(false);
       loadPlaylists();
       loadPlaylist(p.id);
-      
+
       if (!selectedPlaylist) {
         router.push(`/playlists?id=${p.id}&name=${encodeURIComponent(p.name)}`);
       }
@@ -146,10 +145,9 @@ function PlaylistsContent() {
 
   useEffect(() => {
     if (initialType === 'dynamic' && initialId && initialName) {
-      // For dynamic playlists, build from current player state once
       const featuredTracks = track ? [track, ...queue].slice(0, 6) : queue.slice(0, 6);
       let tracksData: any[] = [];
-      
+
       if (initialId === 'daily-mix') {
         tracksData = featuredTracks;
       } else if (initialId === 'quick-picks') {
@@ -182,8 +180,7 @@ function PlaylistsContent() {
     } else {
       setSelectedPlaylist(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialId, initialName, initialType]);
+  }, [initialId, initialName, initialType, track, queue]);
 
   const formatDuration = (ms: number) => {
     const s = Math.floor(ms / 1000);
@@ -230,16 +227,16 @@ function PlaylistsContent() {
     if (!selectedPlaylist || !selectedPlaylist.tracks || selectedPlaylist.tracks.length === 0) {
       return alert("This playlist is empty.");
     }
-    
+
     let tracksToSend = [...selectedPlaylist.tracks];
-    
+
     if (shuffleEnabled) {
       for (let i = tracksToSend.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [tracksToSend[i], tracksToSend[j]] = [tracksToSend[j], tracksToSend[i]];
       }
     }
-    
+
     const mappedTracks = tracksToSend.map(t => ({
       title: t.track_title,
       author: t.track_author || 'Unknown Artist',
@@ -249,7 +246,7 @@ function PlaylistsContent() {
       artwork_url: t.artwork_url,
       source: 'unknown',
     }));
-    
+
     try {
       await api.post('/player/play', {
         guild_id: selectedGuild,
@@ -263,7 +260,7 @@ function PlaylistsContent() {
 
   const executeDeletePlaylist = async () => {
     if (!selectedPlaylist) return;
-    
+
     try {
       await api.delete(`/playlists/${selectedPlaylist.id}`);
       setSelectedPlaylist(null);
@@ -284,26 +281,26 @@ function PlaylistsContent() {
         <div className="relative z-10 flex flex-1 min-h-0 flex-col">
           <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
             <section className="min-h-0 flex-1 overflow-y-auto rounded-[22px] bg-[#121212]/90 relative">
-              
+
               {/* Top Gradient Banner */}
               <div className="relative rounded-t-[22px] shrink-0 bg-gradient-to-br from-[#064e3b] via-[#022c22] to-[#111111] p-4 md:p-6 lg:p-8 z-10">
                 <div className="absolute inset-0 overflow-hidden rounded-t-[22px] pointer-events-none">
                   <BackgroundWaveform isPlaying={isPlaying} track={track} />
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,_rgba(16,185,129,0.15),_transparent_30%)]" />
                 </div>
-                
+
                 <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-4">
                   <div>
                     {selectedPlaylist ? (
-                      <button onClick={() => { 
-                        setSelectedPlaylist(null); 
+                      <button onClick={() => {
+                        setSelectedPlaylist(null);
                         if (initialType === 'dynamic') {
                           router.push('/dashboard');
                         } else {
-                          router.push('/playlists'); 
+                          router.push('/playlists');
                         }
                       }} className="mb-2 text-emerald-400 hover:text-emerald-300 flex items-center gap-2 text-sm font-semibold transition">
-                        <Icon name="arrow-left" className="w-4 h-4" /> 
+                        <Icon name="arrow-left" className="w-4 h-4" />
                         {initialType === 'dynamic' ? 'Back to Now Playing' : 'Back to Playlists'}
                       </button>
                     ) : (
@@ -313,8 +310,8 @@ function PlaylistsContent() {
                       {selectedPlaylist ? selectedPlaylist.name : 'Playlists'}
                     </h1>
                     <p className="mt-3 max-w-xl text-sm text-zinc-300">
-                      {selectedPlaylist 
-                        ? `${selectedPlaylist.track_count || 0} tracks • ${selectedPlaylist.playlist_type}` 
+                      {selectedPlaylist
+                        ? `${selectedPlaylist.track_count || 0} tracks • ${selectedPlaylist.playlist_type}`
                         : 'Create, manage, and play your personal and server music collections.'}
                     </p>
                   </div>
@@ -327,21 +324,21 @@ function PlaylistsContent() {
                         + Create Playlist
                       </button>
                       <div className="relative">
-                        <button 
+                        <button
                           onClick={() => setShowMainDropdown(!showMainDropdown)}
                           className="p-2 text-zinc-400 hover:text-white transition-colors"
                           title="More options"
                         >
                           <Icon name="more-horizontal" className="w-7 h-7" />
                         </button>
-                        
+
                         {showMainDropdown && (
                           <>
                             <div className="fixed inset-0 z-40" onClick={() => setShowMainDropdown(false)} />
                             <div className="absolute top-full right-0 mt-2 w-48 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.15),_transparent_80%)] pointer-events-none" />
                               <div className="relative p-1">
-                                <button 
+                                <button
                                   onClick={() => { setShowImportModal(true); setShowMainDropdown(false); }}
                                   className="w-full px-4 py-3 text-left text-sm text-zinc-200 hover:bg-white/5 rounded-xl flex items-center gap-3 transition-colors font-semibold"
                                 >
@@ -357,15 +354,15 @@ function PlaylistsContent() {
                   )}
                   {selectedPlaylist && (
                     <div className="flex items-center gap-6 shrink-0 mt-4 md:mt-0 pb-2">
-                      <button 
-                        onClick={() => handlePlayPlaylist('play')} 
+                      <button
+                        onClick={() => handlePlayPlaylist('play')}
                         className="w-14 h-14 bg-emerald-500 text-black rounded-full flex items-center justify-center hover:scale-105 hover:bg-emerald-400 transition-transform shadow-xl shrink-0"
                         title="Play"
                       >
                         <Icon name="play" className="w-6 h-6 fill-black ml-1" />
                       </button>
-                      <button 
-                        onClick={() => setShuffleEnabled(!shuffleEnabled)} 
+                      <button
+                        onClick={() => setShuffleEnabled(!shuffleEnabled)}
                         className={`p-2 transition-all shrink-0 ${shuffleEnabled ? 'text-emerald-500 hover:text-emerald-400 hover:scale-105' : 'text-zinc-500 hover:text-zinc-400 hover:scale-105'}`}
                         title={shuffleEnabled ? 'Disable Shuffle' : 'Enable Shuffle'}
                       >
@@ -373,28 +370,28 @@ function PlaylistsContent() {
                       </button>
 
                       <div className="relative">
-                        <button 
+                        <button
                           onClick={() => setShowDropdown(!showDropdown)}
                           className="p-2 text-zinc-400 hover:text-white transition-colors shrink-0"
                           title="More options"
                         >
                           <Icon name="more-horizontal" className="w-7 h-7" />
                         </button>
-                        
+
                         {showDropdown && (
                           <>
                             <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
                             <div className="absolute top-full left-0 md:left-auto md:right-0 mt-2 w-56 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.15),_transparent_80%)] pointer-events-none" />
                               <div className="relative p-1">
-                                <button 
+                                <button
                                   onClick={() => { handlePlayPlaylist('queue'); setShowDropdown(false); }}
                                   className="w-full px-4 py-3 text-left text-sm text-zinc-200 hover:bg-white/5 rounded-xl flex items-center gap-3 transition-colors font-semibold"
                                 >
                                   <Icon name="list-plus" className="w-4 h-4 text-emerald-400" />
                                   Add to queue
                                 </button>
-                                <button 
+                                <button
                                   onClick={() => { setShowImportModal(true); setShowDropdown(false); }}
                                   className="w-full px-4 py-3 text-left text-sm text-zinc-200 hover:bg-white/5 rounded-xl flex items-center gap-3 transition-colors font-semibold"
                                 >
@@ -402,7 +399,7 @@ function PlaylistsContent() {
                                   Import Tracks
                                 </button>
                                 <div className="h-px bg-white/5 my-1 mx-2" />
-                                <button 
+                                <button
                                   onClick={() => { setShowDeleteModal(true); setShowDropdown(false); }}
                                   className="w-full px-4 py-3 text-left text-sm text-red-400 hover:bg-red-500/10 rounded-xl flex items-center gap-3 transition-colors font-semibold"
                                 >
@@ -423,7 +420,7 @@ function PlaylistsContent() {
               <div className="p-4 md:p-6 lg:p-8 pb-24 md:pb-32 lg:pb-32">
                 {!selectedPlaylist && (
                   <div className="relative flex items-center bg-black/60 p-1 rounded-full w-fit mb-6 ring-1 ring-white/10 shadow-inner">
-                    <div 
+                    <div
                       className={`absolute inset-y-1 w-[120px] bg-emerald-500 rounded-full transition-all duration-300 ease-out shadow-lg ${activeTab === 'server' ? 'translate-x-[120px]' : 'translate-x-0'}`}
                     />
                     <button
@@ -454,7 +451,7 @@ function PlaylistsContent() {
                             <p className="text-sm font-semibold text-white truncate group-hover:text-emerald-400 transition">{t.track_title}</p>
                             <p className="text-xs text-zinc-400 truncate mt-0.5">{t.track_author || 'Unknown Artist'}</p>
                           </div>
-                          
+
                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => handlePlay(t, 'play')} className="p-2 rounded-full hover:bg-emerald-500 hover:text-emerald-950 text-zinc-300 transition" title="Play Now">
                               {feedbackId === `${t.id}-play` ? <Icon name="check-circle" className="w-4 h-4" /> : <Icon name="play" className="w-4 h-4" />}
@@ -466,7 +463,7 @@ function PlaylistsContent() {
                               <Icon name="x" className="w-4 h-4" />
                             </button>
                           </div>
-                          
+
                           <div className="text-xs text-zinc-500 font-medium tabular-nums w-12 text-right">
                             {t.duration_ms ? formatDuration(t.duration_ms) : '--:--'}
                           </div>
@@ -527,7 +524,7 @@ function PlaylistsContent() {
                         </div>
                         <h2 className="text-xl font-black text-white">No {activeTab === 'server' ? 'Server' : 'Personal'} Playlists</h2>
                         <p className="text-sm text-zinc-400 mt-2 max-w-md text-center">
-                          {activeTab === 'server' 
+                          {activeTab === 'server'
                             ? "Create a server playlist to share tracks with everyone in this Discord server."
                             : "Create your first personal playlist to start saving tracks."}
                         </p>
@@ -539,26 +536,26 @@ function PlaylistsContent() {
                   </>
                 )}
               </div>
-              
+
             </section>
           </div>
         </div>
       </div>
-      
+
       {/* Creation Modal (Moved outside overflow-hidden to fix clipping) */}
       {showCreate && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 pointer-events-auto animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) setShowCreate(false) }}>
           <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-zinc-900 border border-white/10 shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.15),_transparent_80%)] pointer-events-none" />
-            
+
             <div className="relative p-6 border-b border-white/5 flex justify-between items-start">
               <div className="flex flex-col gap-1 pr-4">
                 <h3 className="text-xl font-black text-white">
                   Create {activeTab === 'server' ? 'Server' : 'Personal'} Playlist
                 </h3>
                 <p className="text-sm text-zinc-400">
-                  {activeTab === 'server' 
-                    ? "Bound to the selected server. DJs/Admins only." 
+                  {activeTab === 'server'
+                    ? "Bound to the selected server. DJs/Admins only."
                     : "Bound to your account. Only you can view or edit."}
                 </p>
               </div>
@@ -566,7 +563,7 @@ function PlaylistsContent() {
                 <Icon name="x" className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="relative p-6">
               <form onSubmit={createPlaylist} className="space-y-6">
                 <div>
@@ -599,7 +596,7 @@ function PlaylistsContent() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 pointer-events-auto animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget && !importing) setShowImportModal(false) }}>
           <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-zinc-900 border border-white/10 shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.15),_transparent_80%)] pointer-events-none" />
-            
+
             <div className="relative p-6 border-b border-white/5 flex justify-between items-start">
               <div className="flex flex-col gap-1 pr-4">
                 <h3 className="text-xl font-black text-white">
@@ -613,7 +610,7 @@ function PlaylistsContent() {
                 <Icon name="x" className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="relative p-6">
               <form onSubmit={importPlaylist} className="space-y-6">
                 <div>
@@ -646,13 +643,13 @@ function PlaylistsContent() {
           </div>
         </div>
       )}
-      
+
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 pointer-events-auto animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) setShowDeleteModal(false) }}>
           <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-zinc-900 border border-white/10 shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(239,68,68,0.15),_transparent_80%)] pointer-events-none" />
-            
+
             <div className="relative p-6 border-b border-white/5 flex justify-between items-start">
               <div className="flex flex-col gap-1 pr-4">
                 <h3 className="text-xl font-black text-white">Delete Playlist</h3>
@@ -664,7 +661,7 @@ function PlaylistsContent() {
                 <Icon name="x" className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="relative p-6">
               <p className="text-zinc-300 text-sm mb-6 font-medium">
                 This action cannot be undone. All tracks in this playlist will be removed from your collection.

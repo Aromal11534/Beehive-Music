@@ -21,7 +21,7 @@ function getTrackAuthor(track: PlayerTrack | null | undefined) {
 export function GlobalPlayer() {
   const { state, localPosition, isDraggingRef, sendCommand, commitSeek, handleVolumeChange } = usePlayer();
   const { guilds, selectedGuild } = useGuilds();
-  
+
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [localVolume, setLocalVolume] = useState<number | null>(null);
@@ -32,7 +32,7 @@ export function GlobalPlayer() {
     setMounted(true);
     api.get<PlaylistSummary[]>('/playlists').then((data) => {
       setPlaylists(Array.isArray(data) ? data : []);
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   const track = state?.current_track;
@@ -59,11 +59,11 @@ export function GlobalPlayer() {
       await api.post('/favorites', {
         track_title: currentTitle || 'Unknown Title',
         track_author: currentAuthor || 'Unknown Artist',
-        track_url: track.track_url || track.url || track.identifier || 'unknown',
-        track_identifier: track.identifier || track.track_identifier || null,
+        track_url: (track as any).track_url || track.url || track.identifier || 'unknown',
+        track_identifier: track.identifier || (track as any).track_identifier || null,
         duration_ms: duration || 0,
-        source: track.source || 'unknown',
-        artwork_url: track.artwork_url || track.artworkUrl || null,
+        source: track.source || (track as any).source || 'unknown',
+        artwork_url: track.artwork_url || (track as any).artworkUrl || null,
       });
       showActionFeedback('Added to Favorites');
     } catch (error: any) {
@@ -82,11 +82,11 @@ export function GlobalPlayer() {
       await api.post(`/playlists/${playlistId}/tracks`, {
         track_title: currentTitle || 'Unknown Title',
         track_author: currentAuthor || 'Unknown Artist',
-        track_url: track.track_url || track.url || track.identifier || 'unknown',
-        track_identifier: track.identifier || track.track_identifier || null,
+        track_url: (track as any).track_url || track.url || track.identifier || 'unknown',
+        track_identifier: track.identifier || (track as any).track_identifier || null,
         duration_ms: track.duration_ms || track.duration || duration || 0,
-        source: track.source || 'unknown',
-        artwork_url: track.artwork_url || track.artworkUrl || null,
+        source: track.source || (track as any).source || 'unknown',
+        artwork_url: track.artwork_url || (track as any).artworkUrl || null,
       });
       setShowPlaylistMenu(false);
       showActionFeedback('Added to Playlist');
@@ -177,7 +177,7 @@ export function GlobalPlayer() {
         {/* Right: Volume & Extras */}
         <div className="flex items-center justify-end gap-4">
           <div className="flex items-center gap-2 w-32">
-            <button 
+            <button
               onClick={() => {
                 const newVol = currentVolume === 0 ? 100 : 0;
                 setLocalVolume(newVol);
@@ -210,7 +210,7 @@ export function GlobalPlayer() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) setShowPlaylistMenu(false) }}>
           <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-zinc-900 border border-white/10 shadow-2xl flex flex-col">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(245,158,11,0.15),_transparent_80%)] pointer-events-none" />
-            
+
             <div className="relative p-6 border-b border-white/5 flex justify-between items-start">
               <div className="flex flex-col gap-1 pr-4">
                 <h3 className="text-xl font-black text-white">Add to Playlist</h3>
@@ -220,7 +220,7 @@ export function GlobalPlayer() {
                 <Icon name="x" className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="relative p-2 h-[300px] overflow-y-auto">
               {playlists.length === 0 ? (
                 <div className="p-8 h-full flex flex-col items-center justify-center text-center">
@@ -233,9 +233,9 @@ export function GlobalPlayer() {
               ) : (
                 <div className="space-y-1 p-2">
                   {playlists.map((playlist) => (
-                    <button 
-                      key={playlist.id} 
-                      onClick={() => handleAddPlaylist(playlist.id)} 
+                    <button
+                      key={playlist.id}
+                      onClick={() => handleAddPlaylist(playlist.id)}
                       className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group text-left"
                     >
                       <div className="w-10 h-10 rounded-lg bg-black/40 flex items-center justify-center group-hover:bg-amber-500/20 group-hover:text-amber-400 text-zinc-500 transition shadow-inner shrink-0">

@@ -270,3 +270,51 @@ class AuthService:
         user.updated_at = datetime.now(timezone.utc)
         await redis_client.delete(f"password_reset:{token}")
 
+    async def login_with_discord(self, discord_id: str, email: str | None, username: str, ip: str | None = None, user_agent: str | None = None) -> dict:
+        """Authenticate or register user via Discord OAuth."""
+        # 1. Try finding by discord_id
+        result = await self.db.execute(select(User).where(User.discord_id == discord_id))
+        user = result.scalar_one_or_none()
+        
+        if not user and email:
+            # 2. Try finding by email
+            result = await self.db.execute(select(User).where(User.email == email))
+            user = result.scalar_one_or_none()
+            if user:
+                # Link account
+                user.discord_id = discord_id
+                self.db.add(user)
+        
+        if not user:
+            # 3. Create new user
+            from app.core.security import hash_password
+            
+            # Ensure unique username
+            base_username = username
+            counter = 1
+            while True:
+                existing = await self.db.execute(select(User).where(User.username == username))
+                if not existing.scalar_one_or_none():
+                    break
+                username = f"{base_username}{counter}"
+                counter += 1
+                
+            random_password = secrets.token_urlsafe(32)
+            user = User(
+                username=username,
+                email=email,
+                display_name=username,
+                password_hash=hash_password(random_password),
+                discord_id=discord_id,
+                is_admin=False
+            )
+            self.db.add(user)
+            await self.db.flush()
+
+        if not user.is_active:
+            raise AuthenticationError("Account is deactivated")
+            
+        await self.db.commit()
+
+        return await self._create_session(user, ip, user_agent)
+

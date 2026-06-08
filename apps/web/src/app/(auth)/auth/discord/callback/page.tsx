@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 
 interface DiscordSyncResponse {
   discord_username: string;
@@ -12,6 +13,7 @@ interface DiscordSyncResponse {
 function DiscordCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { setAuthData } = useAuth();
   const [status, setStatus] = useState('Connecting to Discord...');
   const hasAttempted = useRef(false);
 
@@ -20,6 +22,7 @@ function DiscordCallbackInner() {
     
     const code = searchParams.get('code');
     const error = searchParams.get('error');
+    const state = searchParams.get('state');
 
     if (error) {
       setTimeout(() => setStatus(`Discord connection failed: ${error}`), 0);
@@ -34,24 +37,45 @@ function DiscordCallbackInner() {
     }
 
     hasAttempted.current = true;
-    setTimeout(() => setStatus('Syncing servers...'), 0);
 
     const redirectUri = `${window.location.origin}/auth/discord/callback`;
 
-    api.post<DiscordSyncResponse>('/auth/discord/sync', {
-      code,
-      redirect_uri: redirectUri
-    })
-      .then((res) => {
-        setStatus(`Success! Linked as ${res.discord_username}. Synced ${res.synced_guilds} server(s).`);
-        setTimeout(() => router.push('/servers'), 3000);
+    if (state === 'login') {
+      setTimeout(() => setStatus('Logging you in...'), 0);
+      
+      api.post<any>('/auth/discord/login', {
+        code,
+        redirect_uri: redirectUri
       })
-      .catch((err) => {
-        console.error('Discord sync error:', err);
-        setStatus('Failed to connect to Discord. Ensure the server is configured properly.');
-        setTimeout(() => router.push('/servers'), 3000);
-      });
-  }, [searchParams, router]);
+        .then(async (res) => {
+          await setAuthData(res);
+          setStatus('Success! Redirecting...');
+          setTimeout(() => router.push('/'), 1500);
+        })
+        .catch((err) => {
+          console.error('Discord login error:', err);
+          setStatus('Failed to login via Discord.');
+          setTimeout(() => router.push('/login'), 3000);
+        });
+        
+    } else {
+      setTimeout(() => setStatus('Syncing servers...'), 0);
+
+      api.post<DiscordSyncResponse>('/auth/discord/sync', {
+        code,
+        redirect_uri: redirectUri
+      })
+        .then((res) => {
+          setStatus(`Success! Linked as ${res.discord_username}. Synced ${res.synced_guilds} server(s).`);
+          setTimeout(() => router.push('/servers'), 3000);
+        })
+        .catch((err) => {
+          console.error('Discord sync error:', err);
+          setStatus('Failed to connect to Discord. Ensure the server is configured properly.');
+          setTimeout(() => router.push('/servers'), 3000);
+        });
+    }
+  }, [searchParams, router, setAuthData]);
 
   return (
     <div className="flex h-screen items-center justify-center bg-zinc-950">

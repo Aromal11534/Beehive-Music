@@ -26,7 +26,7 @@ function getDiscordConnectUrl() {
   if (!clientId || typeof window === 'undefined') return null;
 
   const redirectUri = encodeURIComponent(`${window.location.origin}/auth/discord/callback`);
-  return `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify%20guilds`;
+  return `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify%20guilds%20email&state=sync`;
 }
 
 export default function ServersPage() {

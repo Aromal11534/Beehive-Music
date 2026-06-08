@@ -33,20 +33,20 @@ function getAuthor(t: PlayerTrack | null | undefined) {
   return t?.author || (t as any)?.track_author || 'Unknown Artist';
 }
 
-function SortableQueueItem({ 
-  item, 
-  index, 
-  onRemove, 
-  onPlayNow, 
-  onAddFavorite, 
-  onAddPlaylist 
-}: { 
-  item: PlayerTrack, 
-  index: number, 
-  onRemove: () => void, 
-  onPlayNow: () => void, 
-  onAddFavorite: () => void, 
-  onAddPlaylist: () => void 
+function SortableQueueItem({
+  item,
+  index,
+  onRemove,
+  onPlayNow,
+  onAddFavorite,
+  onAddPlaylist
+}: {
+  item: PlayerTrack,
+  index: number,
+  onRemove: () => void,
+  onPlayNow: () => void,
+  onAddFavorite: () => void,
+  onAddPlaylist: () => void
 }) {
   const {
     attributes,
@@ -117,7 +117,7 @@ export default function QueuePage() {
   useEffect(() => {
     api.get<PlaylistSummary[]>('/playlists').then((data) => {
       setPlaylists(Array.isArray(data) ? data : []);
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function QueuePage() {
       const oldIndex = optimisticQueue.findIndex((_, i) => `track-${i}` === active.id);
       const newIndex = optimisticQueue.findIndex((_, i) => `track-${i}` === over.id);
       if (oldIndex === -1 || newIndex === -1) return;
-      
+
       if (sendCommand('move', { from: oldIndex, to: newIndex })) {
         setOptimisticQueue((q) => arrayMove(q, oldIndex, newIndex));
       } else {
@@ -163,11 +163,11 @@ export default function QueuePage() {
       await api.post('/favorites', {
         track_title: getTitle(track),
         track_author: getAuthor(track),
-        track_url: track.track_url || track.url || track.identifier || 'unknown',
-        track_identifier: track.identifier || track.track_identifier || null,
+        track_url: (track as any).track_url || track.url || track.identifier || 'unknown',
+        track_identifier: track.identifier || (track as any).track_identifier || null,
         duration_ms: track.duration_ms || track.duration || 0,
-        source: track.source || 'unknown',
-        artwork_url: track.artwork_url || track.artworkUrl || null,
+        source: track.source || (track as any).source || 'unknown',
+        artwork_url: track.artwork_url || (track as any).artworkUrl || null,
       });
       toast.success('Added to Favorites');
     } catch (error: any) {
@@ -190,11 +190,11 @@ export default function QueuePage() {
       await api.post(`/playlists/${playlistId}/tracks`, {
         track_title: getTitle(targetTrack),
         track_author: getAuthor(targetTrack),
-        track_url: targetTrack.track_url || targetTrack.url || targetTrack.identifier || 'unknown',
-        track_identifier: targetTrack.identifier || targetTrack.track_identifier || null,
+        track_url: (targetTrack as any).track_url || targetTrack.url || targetTrack.identifier || 'unknown',
+        track_identifier: targetTrack.identifier || (targetTrack as any).track_identifier || null,
         duration_ms: targetTrack.duration_ms || targetTrack.duration || 0,
-        source: targetTrack.source || 'unknown',
-        artwork_url: targetTrack.artwork_url || targetTrack.artworkUrl || null,
+        source: targetTrack.source || (targetTrack as any).source || 'unknown',
+        artwork_url: targetTrack.artwork_url || (targetTrack as any).artworkUrl || null,
       });
       setShowPlaylistMenu(false);
       toast.success('Added to Playlist');
@@ -222,8 +222,8 @@ export default function QueuePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">Queue</h1>
         {optimisticQueue.length > 0 && (
-          <button 
-            onClick={handleClearQueue} 
+          <button
+            onClick={handleClearQueue}
             className="text-xs font-semibold text-red-400 hover:text-red-300 bg-red-400/10 hover:bg-red-400/20 px-3 py-1.5 rounded transition flex items-center gap-1.5"
           >
             <Icon name="trash" className="w-3.5 h-3.5" />
@@ -231,7 +231,7 @@ export default function QueuePage() {
           </button>
         )}
       </div>
-      
+
       {!track && optimisticQueue.length === 0 ? (
         <div className="glass-card p-16 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-800 text-zinc-400">
@@ -272,7 +272,7 @@ export default function QueuePage() {
           {optimisticQueue.length > 0 && (
             <div className="glass-card p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-4">{optimisticQueue.length} Tracks in Queue</p>
-              
+
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={optimisticQueue.map((_, i) => `track-${i}`)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-2">
@@ -299,7 +299,7 @@ export default function QueuePage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) setShowPlaylistMenu(false) }}>
           <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-zinc-900 border border-white/10 shadow-2xl flex flex-col">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(245,158,11,0.15),_transparent_80%)] pointer-events-none" />
-            
+
             <div className="relative p-6 border-b border-white/5 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-black text-white">Add to Playlist</h3>
@@ -309,7 +309,7 @@ export default function QueuePage() {
                 <Icon name="x" className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="relative p-2 max-h-[350px] overflow-y-auto">
               {playlists.length === 0 ? (
                 <div className="p-8 text-center flex flex-col items-center">
@@ -322,9 +322,9 @@ export default function QueuePage() {
               ) : (
                 <div className="space-y-1 p-2">
                   {playlists.map((playlist) => (
-                    <button 
-                      key={playlist.id} 
-                      onClick={() => handleAddPlaylist(playlist.id)} 
+                    <button
+                      key={playlist.id}
+                      onClick={() => handleAddPlaylist(playlist.id)}
                       className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group text-left"
                     >
                       <div className="w-10 h-10 rounded-lg bg-black/40 flex items-center justify-center group-hover:bg-amber-500/20 group-hover:text-amber-400 text-zinc-500 transition shadow-inner">

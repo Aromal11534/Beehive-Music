@@ -1,21 +1,84 @@
 from typing import Any
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
 import os
 
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps import get_current_user, get_client_ip
 from app.models.user import User
 from app.models.guild import DiscordGuild, UserGuildAccess
+from app.schemas.auth import LoginResponse
+from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth/discord", tags=["auth-discord"])
 
 class DiscordSyncRequest(BaseModel):
     code: str
     redirect_uri: str
+
+@router.post("/login", response_model=LoginResponse)
+async def login_with_discord(
+    request: DiscordSyncRequest,
+    req: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Exchange Discord OAuth code and login/register."""
+    client_id = os.environ.get("DISCORD_CLIENT_ID")
+    client_secret = os.environ.get("DISCORD_CLIENT_SECRET")
+    
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=500, detail="Discord OAuth is not configured on the server.")
+        
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(
+            "https://discord.com/api/oauth2/token",
+            data={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "grant_type": "authorization_code",
+                "code": request.code,
+                "redirect_uri": request.redirect_uri,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        
+        if token_response.status_code != 200:
+            print("Token error:", token_response.text)
+            raise HTTPException(status_code=400, detail="Failed to exchange authorization code.")
+            
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+        
+        if not access_token:
+            raise HTTPException(status_code=400, detail="No access token returned from Discord.")
+            
+        user_response = await client.get(
+            "https://discord.com/api/users/@me",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        if user_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch Discord user.")
+            
+        discord_user = user_response.json()
+        discord_id = discord_user.get("id")
+        email = discord_user.get("email")
+        username = discord_user.get("username")
+        
+        service = AuthService(db)
+        ip = get_client_ip(req)
+        ua = req.headers.get("user-agent")
+        
+        result = await service.login_with_discord(
+            discord_id=discord_id,
+            email=email,
+            username=username,
+            ip=ip,
+            user_agent=ua
+        )
+        return result
 
 @router.post("/sync")
 async def sync_discord_account(

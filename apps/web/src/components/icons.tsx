@@ -36,7 +36,8 @@ export type IconName =
   | 'volume-2'
   | 'x'
   | 'plus'
-  | 'list-plus';
+  | 'list-plus'
+  | 'refresh-cw';
 
 const paths: Record<IconName, ReactElement> = {
   admin: <path d="M12 3l7 3v5c0 4.5-2.9 8.7-7 10-4.1-1.3-7-5.5-7-10V6l7-3z M9.5 12l1.8 1.8 3.7-4" />,
@@ -57,6 +58,7 @@ const paths: Record<IconName, ReactElement> = {
   plus: <path d="M12 5v14M5 12h14" />,
   'list-plus': <><path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="M18 9v6"/><path d="M21 12h-6"/></>,
   queue: <path d="M4 7h16M4 12h16M4 17h10" />,
+  'refresh-cw': <><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></>,
   repeat: <path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3" />,
   'repeat-one': <path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3M12 9v6" />,
   search: <path d="M18 18l3 3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0z" />,

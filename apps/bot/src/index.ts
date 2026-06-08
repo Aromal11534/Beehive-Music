@@ -114,9 +114,9 @@ async function main() {
       console.error(`[Command Error] ${interaction.commandName}:`, error);
       const content = 'An error occurred while executing this command.';
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content, ephemeral: true }).catch(() => {});
+        await interaction.followUp({ content, ephemeral: true }).catch(() => { });
       } else {
-        await interaction.reply({ content, ephemeral: true }).catch(() => {});
+        await interaction.reply({ content, ephemeral: true }).catch(() => { });
       }
     }
   });
@@ -184,8 +184,36 @@ async function main() {
             console.warn(`[WebCommand] Leave rejected: no user_id provided for guild ${guildId}`);
             break;
           }
-          console.log(`[WebCommand] Disconnecting from voice in guild ${guildId} as requested by user ${command.user_id}.`);
-          await musicManager.disconnect(guildId);
+          const guild = client.guilds.cache.get(guildId);
+          if (guild) {
+            console.log(`[WebCommand] Leaving guild ${guild.name} (${guildId}) as requested by user ${command.user_id}.`);
+            await musicManager.disconnect(guildId);
+            await guild.leave();
+          }
+          break;
+        }
+        case 'reload': {
+          if (!command.user_id) {
+            console.warn(`[WebCommand] Reload rejected: no user_id provided for guild ${guildId}`);
+            break;
+          }
+          const guild = client.guilds.cache.get(guildId);
+          if (!guild) break;
+          const member = await guild.members.fetch(command.user_id).catch(() => null);
+          const vcId = member?.voice?.channel?.id;
+          if (vcId) {
+            console.log(`[WebCommand] Reloading bot in guild ${guild.name} (${guildId}) as requested by user ${command.user_id}.`);
+            await musicManager.joinChannel(guildId, vcId);
+            const queue = musicManager.getQueue(guildId);
+            if (queue.current) {
+              await musicManager.playTrack(guildId, queue.current);
+            } else {
+              const next = queue.next();
+              if (next) await musicManager.playTrack(guildId, next);
+            }
+          } else {
+            console.warn(`[WebCommand] Reload aborted: user ${command.user_id} is not in a voice channel in guild ${guildId}`);
+          }
           break;
         }
         case 'remove': {
@@ -231,7 +259,7 @@ async function main() {
 
       const result = await musicManager.search(query, query.startsWith('http') ? 'ytsearch' : 'ytmsearch');
       console.log(`[Search] Lavalink result loadType:`, result?.loadType);
-      
+
       interface SearchTrackResult {
         encoded: string;
         title: string;
@@ -315,7 +343,7 @@ async function main() {
       if (action === 'queue') {
         queue.addMany(queueTracks);
         const state = musicManager.getState(guild_id);
-        
+
         // If the bot isn't playing anything, auto-start playback
         if (!state.currentTrack && !state.isPlaying) {
           const first = queue.next();
@@ -330,7 +358,7 @@ async function main() {
                   if (member?.voice.channel) {
                     vcId = member.voice.channel.id;
                   }
-                } catch {}
+                } catch { }
               }
               if (!vcId) {
                 const vc = guild.channels.cache.find((ch) => ch.isVoiceBased() && ch.members.size > 0);

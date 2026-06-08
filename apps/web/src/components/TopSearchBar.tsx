@@ -5,6 +5,8 @@ import { api } from '@/lib/api';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
 import { FallbackImage } from '@/components/FallbackImage';
+import { useAuth } from '@/context/AuthContext';
+import { usePlayer } from '@/context/PlayerContext';
 
 interface SearchTrack {
   encoded: string;
@@ -26,6 +28,9 @@ export function TopSearchBar() {
   const [feedback, setFeedback] = useState<{ idx: number; msg: string } | null>(null);
   
   const { guilds, selectedGuild, setSelectedGuild } = useGuilds();
+  const { user } = useAuth();
+  const { sendCommand } = usePlayer();
+  const [isReloading, setIsReloading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -93,45 +98,62 @@ export function TopSearchBar() {
           />
         </div>
         {guilds.length > 0 && (
-          <div className="relative shrink-0 w-[140px]">
+          <div className="relative shrink-0 flex items-center gap-1.5">
+            <div className="relative w-[140px]">
+              <button
+                type="button"
+                onClick={() => setIsGuildDropdownOpen(!isGuildDropdownOpen)}
+                className="w-full flex items-center justify-between gap-1.5 px-3 py-1.5 bg-zinc-800/50 border border-zinc-700/50 hover:bg-zinc-700/50 rounded-full text-xs text-zinc-300 focus:outline-none focus:ring-1 focus:ring-amber-500/50 transition whitespace-nowrap"
+              >
+                <span className="truncate text-left flex-1">
+                  {guilds.find(g => g.guild?.discord_guild_id === selectedGuild)?.guild?.name || 'Select Server'}
+                </span>
+                <svg className={`shrink-0 w-3 h-3 text-zinc-500 transition-transform ${isGuildDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+
+              {isGuildDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-zinc-900 border border-zinc-700/50 rounded-xl shadow-2xl overflow-hidden z-50 py-1">
+                  <div className="max-h-[250px] overflow-y-auto">
+                    {guilds.map((g) => {
+                      const isSelected = selectedGuild === g.guild?.discord_guild_id;
+                      return (
+                        <button
+                          key={g.guild?.discord_guild_id || g.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedGuild(g.guild?.discord_guild_id || '');
+                            setIsGuildDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-xs transition-colors flex items-center justify-between ${
+                            isSelected 
+                              ? 'bg-amber-500/10 text-amber-400 font-medium' 
+                              : 'text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100'
+                          }`}
+                        >
+                          <span className="truncate">{g.guild?.name || 'Server'}</span>
+                          {isSelected && <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               type="button"
-              onClick={() => setIsGuildDropdownOpen(!isGuildDropdownOpen)}
-              className="w-full flex items-center justify-between gap-1.5 px-3 py-1.5 bg-zinc-800/50 border border-zinc-700/50 hover:bg-zinc-700/50 rounded-full text-xs text-zinc-300 focus:outline-none focus:ring-1 focus:ring-amber-500/50 transition whitespace-nowrap"
+              onClick={() => {
+                if (selectedGuild) {
+                  setIsReloading(true);
+                  sendCommand('reload');
+                  setTimeout(() => setIsReloading(false), 1000);
+                }
+              }}
+              disabled={isReloading || !selectedGuild}
+              className="shrink-0 p-1.5 rounded-full text-zinc-400 hover:text-amber-400 hover:bg-amber-400/10 transition-all disabled:opacity-50"
+              title="Reload bot in server"
             >
-              <span className="truncate text-left flex-1">
-                {guilds.find(g => g.guild?.discord_guild_id === selectedGuild)?.guild?.name || 'Select Server'}
-              </span>
-              <svg className={`shrink-0 w-3 h-3 text-zinc-500 transition-transform ${isGuildDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              <Icon name="refresh-cw" className={`h-4 w-4 ${isReloading ? 'animate-spin' : ''}`} />
             </button>
-
-            {isGuildDropdownOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-zinc-900 border border-zinc-700/50 rounded-xl shadow-2xl overflow-hidden z-50 py-1">
-                <div className="max-h-[250px] overflow-y-auto">
-                  {guilds.map((g) => {
-                    const isSelected = selectedGuild === g.guild?.discord_guild_id;
-                    return (
-                      <button
-                        key={g.guild?.discord_guild_id || g.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedGuild(g.guild?.discord_guild_id || '');
-                          setIsGuildDropdownOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 text-xs transition-colors flex items-center justify-between ${
-                          isSelected 
-                            ? 'bg-amber-500/10 text-amber-400 font-medium' 
-                            : 'text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100'
-                        }`}
-                      >
-                        <span className="truncate">{g.guild?.name || 'Server'}</span>
-                        {isSelected && <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </form>

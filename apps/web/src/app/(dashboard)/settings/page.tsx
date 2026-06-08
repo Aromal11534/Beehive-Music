@@ -8,9 +8,9 @@ import { Icon, type IconName } from '@/components/icons';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '@/lib/cropUtils';
 
-type SettingsTab = 'profile' | 'security' | 'preferences';
+type SettingsTab = 'profile' | 'security' | 'preferences' | 'admin';
 
-const tabs: Array<{ key: SettingsTab; label: string; description: string; icon: IconName }> = [
+const baseTabs: Array<{ key: SettingsTab; label: string; description: string; icon: IconName }> = [
   { key: 'profile', label: 'Profile', description: 'Identity and avatar', icon: 'users' },
   { key: 'security', label: 'Security', description: 'Password, MFA, sessions', icon: 'lock' },
   { key: 'preferences', label: 'Preferences', description: 'Playback defaults', icon: 'sliders' },
@@ -128,6 +128,20 @@ export default function SettingsPage() {
     }
   };
 
+  const wipeSystemData = async () => {
+    if (!confirm('Are you absolutely sure you want to wipe all system logs, playlists, and favorites? This cannot be undone.')) return;
+    setIsSaving(true);
+    setMessage('');
+    try {
+      const res = await api.post<any>('/admin/wipe-data');
+      setMessage(res.message || 'System data wiped successfully.');
+    } catch (err: unknown) {
+      setMessage(errorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const startMfaSetup = async () => {
     setMessage('');
     try {
@@ -187,6 +201,11 @@ export default function SettingsPage() {
     setMfaCode('');
     setMfaPassword('');
   };
+
+  const tabs = [...baseTabs];
+  if (user?.is_admin) {
+    tabs.splice(2, 0, { key: 'admin', label: 'Admin Actions', description: 'System wipes and data management', icon: 'settings' });
+  }
 
   const activeTab = tabs.find((item) => item.key === tab) || tabs[0];
   const initials = user?.display_name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || '?';
@@ -359,6 +378,32 @@ export default function SettingsPage() {
                     <div className="glass-card p-5 md:p-6">
                       <h3 className="text-lg font-black">More Controls</h3>
                       <p className="mt-2 text-sm leading-6 text-zinc-500">Server-specific playback defaults, notification preferences, and UI personalization can be added here when the API supports persisted preferences.</p>
+                    </div>
+                  </div>
+                ) : null}
+
+                {tab === 'admin' && user?.is_admin ? (
+                  <div className="grid gap-5">
+                    <div className="glass-card p-5 md:p-6 border border-red-500/20 bg-red-500/5">
+                      <h3 className="text-lg font-black text-red-400">Wipe System Data</h3>
+                      <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
+                        This action will permanently delete all non-critical data across the entire system. 
+                        <strong className="text-zinc-300"> User accounts, Discord server configurations, and active sessions will be preserved.</strong>
+                      </p>
+                      <ul className="mt-4 list-disc pl-5 text-sm text-zinc-500 space-y-1">
+                        <li>All user Personal Playlists</li>
+                        <li>All user Favorites</li>
+                        <li>System Play History & Audit Logs</li>
+                      </ul>
+                      <div className="mt-6 pt-6 border-t border-red-500/10">
+                        <button 
+                          onClick={wipeSystemData} 
+                          disabled={isSaving} 
+                          className="rounded-full bg-red-500 px-6 py-2.5 text-sm font-black text-white transition hover:bg-red-400 disabled:opacity-50"
+                        >
+                          {isSaving ? 'Wiping Data...' : 'Wipe System Data'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : null}

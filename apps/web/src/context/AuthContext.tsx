@@ -20,6 +20,7 @@ interface AuthContextType {
   verifyMfa: (mfaToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  setAuthData: (data: LoginResponse) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -100,6 +101,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await refreshUser();
   };
 
+  const setAuthData = async (data: LoginResponse) => {
+    api.setTokens(data.access_token, data.refresh_token);
+    await refreshUser();
+  };
+
   const logout = async () => {
     const refreshToken = localStorage.getItem('beehive_refresh_token');
     try {
@@ -121,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       verifyMfa,
       logout,
       refreshUser,
+      setAuthData,
     }}>
       {children}
     </AuthContext.Provider>

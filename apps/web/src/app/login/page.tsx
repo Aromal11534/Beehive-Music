@@ -1,18 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { BrandMark, Icon } from '@/components/icons';
 
-type AuthView = 'login' | 'signup' | 'forgot' | 'mfa';
+type AuthView = 'login' | 'signup' | 'forgot' | 'mfa' | 'reset';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const resetToken = searchParams.get('reset');
   const { login, register, verifyMfa } = useAuth();
 
-  const [view, setView] = useState<AuthView>('login');
+  const [view, setView] = useState<AuthView>(resetToken ? 'reset' : 'login');
 
   // Login fields
   const [username, setUsername] = useState('');
@@ -28,6 +30,11 @@ export default function LoginPage() {
   // Forgot password fields
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
+
+  // Reset password fields
+  const [resetPassword, setResetPassword] = useState('');
+  const [confirmResetPassword, setConfirmResetPassword] = useState('');
+  const [resetSuccess, setResetSuccess] = useState(false);
 
   // MFA
   const [mfaCode, setMfaCode] = useState('');
@@ -86,6 +93,27 @@ export default function LoginPage() {
       setForgotSent(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to send reset email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    if (resetPassword !== confirmResetPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      await api.post('/auth/reset-password', { token: resetToken, new_password: resetPassword });
+      setResetSuccess(true);
+      setTimeout(() => switchView('login'), 3000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to reset password. The link might be expired.');
     } finally {
       setIsLoading(false);
     }
@@ -198,6 +226,88 @@ export default function LoginPage() {
                   <Icon name="arrow-left" className="h-4 w-4" /> Back to login
                 </button>
               </form>
+            ) : view === 'reset' ? (
+              /* ── Reset Password View ── */
+              <div className="space-y-5">
+                <div className="text-center mb-2">
+                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-800 text-amber-400 mb-3">
+                    <Icon name="lock" className="h-5 w-5" />
+                  </div>
+                  <h2 className="text-lg font-semibold text-zinc-100">Set New Password</h2>
+                  <p className="text-sm text-zinc-500 mt-1">
+                    {resetSuccess ? 'Password reset successfully!' : 'Enter your new password below'}
+                  </p>
+                </div>
+
+                {resetSuccess ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-sm text-center">
+                      <Icon name="check-circle" className="h-5 w-5 mx-auto mb-2" />
+                      Your password has been reset. Redirecting to login...
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleResetPassword} className="space-y-5">
+                    <div>
+                      <label htmlFor="reset-password" className="block text-sm font-medium text-zinc-400 mb-1.5">
+                        New Password
+                      </label>
+                      <input
+                        id="reset-password"
+                        type="password"
+                        value={resetPassword}
+                        onChange={(e) => setResetPassword(e.target.value)}
+                        className={inputClass}
+                        placeholder="Min. 8 characters"
+                        minLength={8}
+                        required
+                        autoFocus
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="confirm-reset-password" className="block text-sm font-medium text-zinc-400 mb-1.5">
+                        Confirm New Password
+                      </label>
+                      <input
+                        id="confirm-reset-password"
+                        type="password"
+                        value={confirmResetPassword}
+                        onChange={(e) => setConfirmResetPassword(e.target.value)}
+                        className={inputClass}
+                        placeholder="Confirm password"
+                        minLength={8}
+                        required
+                      />
+                    </div>
+
+                    {error && (
+                      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+                        {error}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30"
+                    >
+                      {isLoading ? 'Resetting...' : 'Reset Password'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = new URL(window.location.href);
+                        url.searchParams.delete('reset');
+                        window.history.replaceState({}, '', url.toString());
+                        switchView('login');
+                      }}
+                      className="w-full py-2 text-sm text-zinc-500 hover:text-zinc-300 transition inline-flex items-center justify-center gap-2"
+                    >
+                      <Icon name="arrow-left" className="h-4 w-4" /> Back to login
+                    </button>
+                  </form>
+                )}
+              </div>
             ) : view === 'forgot' ? (
               /* ── Forgot Password View ── */
               <div className="space-y-5">
@@ -510,7 +620,7 @@ export default function LoginPage() {
                         return;
                       }
                       const redirectUri = encodeURIComponent(`${window.location.origin}/auth/discord/callback`);
-                      window.location.href = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify+guilds`;
+                      window.location.href = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify+guilds+email&state=login`;
                     }}
                     className="flex items-center justify-center gap-2.5 py-2.5 px-4 bg-[#5865F2]/10 hover:bg-[#5865F2]/20 border border-[#5865F2]/30 rounded-xl text-[#8b97ff] text-sm font-medium transition-all duration-200 hover:border-[#5865F2]/50"
                   >
@@ -530,5 +640,17 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

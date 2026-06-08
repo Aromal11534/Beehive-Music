@@ -131,24 +131,24 @@ async def play_track(
 
 # ── WebSocket (with JWT auth) ────────────────────────────
 
-async def _authenticate_ws(token: str | None, guild_id: str) -> bool:
+async def _authenticate_ws(token: str | None, guild_id: str) -> User | None:
     """Verify JWT token for WebSocket connections."""
     if not token:
-        return False
+        return None
     try:
         payload = decode_access_token(token)
         user_id = payload.get("sub")
         if not user_id:
-            return False
+            return None
 
         async with async_session_factory() as db:
             user = await UserService(db).get_user(int(user_id))
             if not user.is_active:
-                return False
+                return None
             await require_guild_access_by_discord_id(guild_id, user, db)
-        return True
+        return user
     except Exception:
-        return False
+        return None
 
 
 @router.websocket("/ws/{guild_id}")
@@ -162,7 +162,8 @@ async def player_websocket(
     Requires JWT auth via query param: /player/ws/{guild_id}?token=<jwt>
     """
     # Authenticate before accepting the connection
-    if not await _authenticate_ws(token, guild_id):
+    user = await _authenticate_ws(token, guild_id)
+    if not user:
         await websocket.close(code=4401, reason="Unauthorized")
         return
 
@@ -185,6 +186,7 @@ async def player_websocket(
             if data:
                 try:
                     command = json.loads(data)
+                    command["user_id"] = user.discord_id
                     logger.info(f"Publishing command: {command}")
                     await redis_client.publish(f"web_command:{guild_id}", json.dumps(command))
                 except json.JSONDecodeError as e:

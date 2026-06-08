@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, auth_discord, users, mfa, sessions, guilds, playlists, favorites, history, avatars, player, health, stats
+from app.api.v1.endpoints import auth, auth_discord, users, mfa, sessions, guilds, playlists, favorites, history, avatars, player, health, stats, admin
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -19,3 +19,4 @@ api_router.include_router(history.router)
 api_router.include_router(avatars.router)
 api_router.include_router(player.router)
 api_router.include_router(stats.router)
+api_router.include_router(admin.router)

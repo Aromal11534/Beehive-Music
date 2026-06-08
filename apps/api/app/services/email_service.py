@@ -13,6 +13,10 @@ class EmailService:
         """Send an email using SMTP."""
         if not self.settings.smtp_host or not self.settings.smtp_user or not self.settings.smtp_password:
             logger.warning("SMTP configuration is incomplete. Skipping email sending.")
+            logger.info(f"--- MOCK EMAIL TO: {to_email} ---")
+            logger.info(f"Subject: {subject}")
+            logger.info(f"Body:\n{body_text}")
+            logger.info("----------------------------------")
             return False
 
         msg = EmailMessage()
