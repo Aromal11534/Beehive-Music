@@ -92,6 +92,8 @@ async function main() {
       console.error('[Lavalink] Failed to connect on startup:', error);
     });
 
+    await musicManager.restoreQueues(readyClient.guilds.cache.keys());
+
     // Sync guilds to API database
     await guildSync.syncGuilds();
   });
@@ -140,7 +142,7 @@ async function main() {
           const q = musicManager.getQueue(guildId);
           const next = q.next();
           if (next) await musicManager.playTrack(guildId, next);
-          else await musicManager.publishState(guildId);
+          else await musicManager.stop(guildId);
           break;
         }
         case 'previous': {
@@ -236,7 +238,7 @@ async function main() {
         }
         case 'jump': {
           const q = musicManager.getQueue(guildId);
-          if (typeof command.index === 'number') {
+          if (Number.isInteger(command.index)) {
             const track = q.jump(command.index);
             if (track) await musicManager.playTrack(guildId, track);
           }

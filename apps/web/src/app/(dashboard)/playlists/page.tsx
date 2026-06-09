@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import type { PlaylistSummary, PlaylistDetail, PlaylistTrack } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
@@ -25,6 +25,16 @@ function PlaylistsContent() {
   const { guilds, selectedGuild } = useGuilds();
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const [shuffleEnabled, setShuffleEnabled] = useState(true);
+
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof ApiError) return error.message;
+    if (error instanceof Error) return error.message;
+    return fallback;
+  };
+
+  const blurAfterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.currentTarget.blur();
+  };
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -85,8 +95,8 @@ function PlaylistsContent() {
       setNewName('');
       setShowCreate(false);
       loadPlaylists();
-    } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to create playlist. You might not have DJ/Admin permissions.");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Failed to create playlist. You might not have DJ/Admin permissions."));
     }
   };
 
@@ -121,8 +131,8 @@ function PlaylistsContent() {
       if (!selectedPlaylist) {
         router.push(`/playlists?id=${p.id}&name=${encodeURIComponent(p.name)}`);
       }
-    } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to import playlist.");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Failed to import playlist."));
     } finally {
       setImporting(false);
     }
@@ -200,14 +210,14 @@ function PlaylistsContent() {
           identifier: track.track_url,
           duration: track.duration_ms || 0,
           artwork_url: track.artwork_url,
-          source: 'unknown',
+          source: track.source || (track.track_url.includes('spotify') ? 'spotify' : 'youtube'),
         },
         action,
       });
       setFeedbackId(`${track.id}-${action}`);
       setTimeout(() => setFeedbackId(null), 2000);
-    } catch {
-      alert("Failed to play track.");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Failed to play track."));
     }
   };
 
@@ -244,7 +254,7 @@ function PlaylistsContent() {
       identifier: t.track_url,
       duration: t.duration_ms || 0,
       artwork_url: t.artwork_url,
-      source: 'unknown',
+      source: t.source || (t.track_url.includes('spotify') ? 'spotify' : 'youtube'),
     }));
 
     try {
@@ -253,8 +263,8 @@ function PlaylistsContent() {
         tracks: mappedTracks,
         action: actionType,
       });
-    } catch {
-      alert("Failed to play playlist.");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Failed to play playlist."));
     }
   };
 
@@ -266,8 +276,8 @@ function PlaylistsContent() {
       setSelectedPlaylist(null);
       setShowDeleteModal(false);
       loadPlaylists();
-    } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to delete playlist.");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Failed to delete playlist."));
     }
   };
 
@@ -355,15 +365,17 @@ function PlaylistsContent() {
                   {selectedPlaylist && (
                     <div className="flex items-center gap-6 shrink-0 mt-4 md:mt-0 pb-2">
                       <button
+                        onMouseDown={blurAfterClick}
                         onClick={() => handlePlayPlaylist('play')}
-                        className="w-14 h-14 bg-emerald-500 text-black rounded-full flex items-center justify-center hover:scale-105 hover:bg-emerald-400 transition-transform shadow-xl shrink-0"
+                        className="w-14 h-14 bg-emerald-500 text-black rounded-full flex items-center justify-center hover:scale-105 hover:bg-emerald-400 transition-transform shadow-xl shrink-0 focus:outline-none"
                         title="Play"
                       >
                         <Icon name="play" className="w-6 h-6 fill-black ml-1" />
                       </button>
                       <button
+                        onMouseDown={blurAfterClick}
                         onClick={() => setShuffleEnabled(!shuffleEnabled)}
-                        className={`p-2 transition-all shrink-0 ${shuffleEnabled ? 'text-emerald-500 hover:text-emerald-400 hover:scale-105' : 'text-zinc-500 hover:text-zinc-400 hover:scale-105'}`}
+                        className={`p-2 transition-all shrink-0 focus:outline-none ${shuffleEnabled ? 'text-emerald-500 hover:text-emerald-400 hover:scale-105' : 'text-zinc-500 hover:text-zinc-400 hover:scale-105'}`}
                         title={shuffleEnabled ? 'Disable Shuffle' : 'Enable Shuffle'}
                       >
                         <Icon name="shuffle" className="w-7 h-7" />
@@ -371,8 +383,9 @@ function PlaylistsContent() {
 
                       <div className="relative">
                         <button
+                          onMouseDown={blurAfterClick}
                           onClick={() => setShowDropdown(!showDropdown)}
-                          className="p-2 text-zinc-400 hover:text-white transition-colors shrink-0"
+                          className="p-2 text-zinc-400 hover:text-white transition-colors shrink-0 focus:outline-none"
                           title="More options"
                         >
                           <Icon name="more-horizontal" className="w-7 h-7" />
@@ -385,8 +398,9 @@ function PlaylistsContent() {
                               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.15),_transparent_80%)] pointer-events-none" />
                               <div className="relative p-1">
                                 <button
+                                  onMouseDown={blurAfterClick}
                                   onClick={() => { handlePlayPlaylist('queue'); setShowDropdown(false); }}
-                                  className="w-full px-4 py-3 text-left text-sm text-zinc-200 hover:bg-white/5 rounded-xl flex items-center gap-3 transition-colors font-semibold"
+                                  className="w-full px-4 py-3 text-left text-sm text-zinc-200 hover:bg-white/5 rounded-xl flex items-center gap-3 transition-colors font-semibold focus:outline-none"
                                 >
                                   <Icon name="list-plus" className="w-4 h-4 text-emerald-400" />
                                   Add to queue
@@ -453,13 +467,13 @@ function PlaylistsContent() {
                           </div>
 
                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handlePlay(t, 'play')} className="p-2 rounded-full hover:bg-emerald-500 hover:text-emerald-950 text-zinc-300 transition" title="Play Now">
+                            <button onMouseDown={blurAfterClick} onClick={() => handlePlay(t, 'play')} className="p-2 rounded-full hover:bg-emerald-500 hover:text-emerald-950 text-zinc-300 transition focus:outline-none" title="Play Now">
                               {feedbackId === `${t.id}-play` ? <Icon name="check-circle" className="w-4 h-4" /> : <Icon name="play" className="w-4 h-4" />}
                             </button>
-                            <button onClick={() => handlePlay(t, 'queue')} className="p-2 rounded-full hover:bg-white/10 text-zinc-300 transition" title="Add to Queue">
+                            <button onMouseDown={blurAfterClick} onClick={() => handlePlay(t, 'queue')} className="p-2 rounded-full hover:bg-white/10 text-zinc-300 transition focus:outline-none" title="Add to Queue">
                               {feedbackId === `${t.id}-queue` ? <Icon name="check-circle" className="w-4 h-4 text-emerald-400" /> : <Icon name="list-plus" className="w-4 h-4" />}
                             </button>
-                            <button onClick={(e) => handleRemoveTrack(t.id, e)} className="p-2 rounded-full hover:bg-red-500/20 hover:text-red-400 text-zinc-500 transition" title="Remove from Playlist">
+                            <button onMouseDown={blurAfterClick} onClick={(e) => handleRemoveTrack(t.id, e)} className="p-2 rounded-full hover:bg-red-500/20 hover:text-red-400 text-zinc-500 transition focus:outline-none" title="Remove from Playlist">
                               <Icon name="x" className="w-4 h-4" />
                             </button>
                           </div>

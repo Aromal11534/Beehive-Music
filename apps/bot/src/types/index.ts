@@ -10,6 +10,7 @@ export interface BotCommand {
 }
 
 export interface QueueTrack {
+  queueId?: string;
   encoded?: string;
   title: string;
   author: string;

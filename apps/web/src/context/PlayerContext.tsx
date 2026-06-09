@@ -55,6 +55,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const animFrameRef = useRef<number>(0);
   const isDraggingRef = useRef(false);
   const volumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const tick = () => {
@@ -72,6 +73,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!selectedGuild) return;
+    let shouldReconnect = true;
 
     api.get<PlayerState>(`/player/${selectedGuild}`).then((data) => {
       setState(data);
@@ -80,22 +82,36 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setLocalPosition(data?.position_ms || 0);
     }).catch(() => setState(null));
 
-    const wsUrl = getWsBase();
-    const wsToken = localStorage.getItem('beehive_access_token') || '';
-    const ws = new WebSocket(`${wsUrl}/player/ws/${selectedGuild}?token=${encodeURIComponent(wsToken)}`);
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as PlayerState;
-        setState(data);
-        positionRef.current = data.position_ms || 0;
-        lastUpdateRef.current = performance.now();
-      } catch { }
+    const connect = () => {
+      const wsUrl = getWsBase();
+      const wsToken = localStorage.getItem('beehive_access_token') || '';
+      const ws = new WebSocket(`${wsUrl}/player/ws/${selectedGuild}?token=${encodeURIComponent(wsToken)}`);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as PlayerState;
+          setState(data);
+          positionRef.current = data.position_ms || 0;
+          lastUpdateRef.current = performance.now();
+        } catch { }
+      };
+      ws.onerror = () => { };
+      ws.onclose = () => {
+        if (wsRef.current === ws) wsRef.current = null;
+        if (shouldReconnect) {
+          reconnectTimeoutRef.current = setTimeout(connect, 2500);
+        }
+      };
+      wsRef.current = ws;
     };
-    ws.onerror = () => { };
-    ws.onclose = () => { };
-    wsRef.current = ws;
 
-    return () => { ws.close(); };
+    connect();
+
+    return () => {
+      shouldReconnect = false;
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      wsRef.current?.close();
+      wsRef.current = null;
+    };
   }, [selectedGuild]);
 
   const sendCommand = useCallback((action: string, value?: string | number | boolean | Record<string, unknown>) => {

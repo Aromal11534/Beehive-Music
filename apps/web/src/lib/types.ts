@@ -53,12 +53,16 @@ export interface PlaylistSummary {
 
 export interface PlaylistTrack {
   id: number;
+  playlist_id?: number | string;
   track_title: string;
   track_author?: string | null;
   track_url: string;
+  track_identifier?: string | null;
+  source?: string | null;
   duration_ms?: number;
   artwork_url?: string;
   position: number;
+  added_at?: string;
 }
 
 export interface PlaylistDetail extends PlaylistSummary {
@@ -71,15 +75,19 @@ export interface SearchTrack {
 }
 
 export interface PlayerTrack {
+  queue_id?: string | null;
   title?: string;
   track_title?: string;
   author?: string;
   track_author?: string;
   artwork_url?: string;
+  artworkUrl?: string;
   duration?: number;
   duration_ms?: number;
   url?: string;
+  track_url?: string;
   identifier?: string;
+  track_identifier?: string | null;
   source?: string;
 }
 

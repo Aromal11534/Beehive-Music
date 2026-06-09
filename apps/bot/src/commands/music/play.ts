@@ -70,6 +70,8 @@ export const play: BotCommand = {
         if (!queue.current) {
           const first = queue.next();
           if (first) await musicManager.playTrack(guildId, first);
+        } else {
+          await musicManager.publishState(guildId);
         }
         await interaction.editReply({ content: `📋 Added **${tracks.length}** tracks from playlist` });
         return;

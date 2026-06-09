@@ -4,23 +4,53 @@
 
 import { QueueTrack, LoopMode } from '../types';
 
+export interface QueueSnapshot {
+  version: 1;
+  tracks: QueueTrack[];
+  history: QueueTrack[];
+  current: QueueTrack | null;
+  loopMode: LoopMode;
+  volume: number;
+  savedAt: string;
+}
+
 export class QueueManager {
   public tracks: QueueTrack[] = [];
   public history: QueueTrack[] = [];
   public current: QueueTrack | null = null;
   public loopMode: LoopMode = 'off';
   public volume: number = 80;
+  private nextQueueId = 1;
+
+  private withQueueId(track: QueueTrack): QueueTrack {
+    if (track.queueId) return track;
+    return { ...track, queueId: `q-${Date.now()}-${this.nextQueueId++}` };
+  }
+
+  static fromSnapshot(snapshot: QueueSnapshot): QueueManager {
+    const queue = new QueueManager();
+    queue.loopMode = snapshot.loopMode;
+    queue.volume = snapshot.volume;
+    queue.history = snapshot.history.map((track) => queue.withQueueId(track));
+
+    const restoredTracks = snapshot.current
+      ? [snapshot.current, ...snapshot.tracks]
+      : snapshot.tracks;
+    queue.tracks = restoredTracks.map((track) => queue.withQueueId(track));
+    queue.current = null;
+    return queue;
+  }
 
   add(track: QueueTrack): void {
-    this.tracks.push(track);
+    this.tracks.push(this.withQueueId(track));
   }
 
   addNext(track: QueueTrack): void {
-    this.tracks.unshift(track);
+    this.tracks.unshift(this.withQueueId(track));
   }
 
   addMany(tracks: QueueTrack[]): void {
-    this.tracks.push(...tracks);
+    this.tracks.push(...tracks.map((track) => this.withQueueId(track)));
   }
 
   next(): QueueTrack | null {
@@ -87,6 +117,18 @@ export class QueueManager {
 
   clear(): void {
     this.tracks = [];
+  }
+
+  toSnapshot(): QueueSnapshot {
+    return {
+      version: 1,
+      tracks: this.tracks,
+      history: this.history,
+      current: this.current,
+      loopMode: this.loopMode,
+      volume: this.volume,
+      savedAt: new Date().toISOString(),
+    };
   }
 
   get length(): number {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import type { PlayerTrack, PlaylistSummary } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import { toast } from 'sonner';
@@ -26,15 +26,38 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 function getTitle(t: PlayerTrack | null | undefined) {
-  return t?.title || (t as any)?.track_title || 'Unknown Track';
+  return t?.title || t?.track_title || 'Unknown Track';
 }
 
 function getAuthor(t: PlayerTrack | null | undefined) {
-  return t?.author || (t as any)?.track_author || 'Unknown Artist';
+  return t?.author || t?.track_author || 'Unknown Artist';
+}
+
+function getTrackUrl(t: PlayerTrack | null | undefined) {
+  return t?.track_url || t?.url || t?.identifier || t?.track_identifier || 'unknown';
+}
+
+function getTrackIdentifier(t: PlayerTrack | null | undefined) {
+  return t?.identifier || t?.track_identifier || null;
+}
+
+function getArtworkUrl(t: PlayerTrack | null | undefined) {
+  return t?.artwork_url || t?.artworkUrl || null;
+}
+
+function getQueueItemId(t: PlayerTrack, index: number) {
+  return t.queue_id || `${getTrackUrl(t)}-${t.duration_ms || t.duration || 0}-${index}`;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
 }
 
 function SortableQueueItem({
   item,
+  itemId,
   index,
   onRemove,
   onPlayNow,
@@ -42,6 +65,7 @@ function SortableQueueItem({
   onAddPlaylist
 }: {
   item: PlayerTrack,
+  itemId: string,
   index: number,
   onRemove: () => void,
   onPlayNow: () => void,
@@ -55,7 +79,7 @@ function SortableQueueItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: `track-${index}` });
+  } = useSortable({ id: itemId });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -78,8 +102,8 @@ function SortableQueueItem({
       </div>
       <span className="w-6 text-right text-zinc-500 text-sm font-medium shrink-0">{index + 1}</span>
       <div className="relative h-10 w-10 overflow-hidden rounded bg-zinc-800 shrink-0">
-        {item.artwork_url ? (
-          <Image src={item.artwork_url} alt="Artwork" fill className="object-cover" unoptimized />
+        {getArtworkUrl(item) ? (
+          <Image src={getArtworkUrl(item) || ''} alt="Artwork" fill className="object-cover" unoptimized />
         ) : (
           <div className="flex h-full items-center justify-center text-zinc-500"><Icon name="music" className="h-4 w-4" /></div>
         )}
@@ -130,10 +154,10 @@ export default function QueuePage() {
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
+      const { active, over } = event;
     if (active.id !== over?.id && over) {
-      const oldIndex = optimisticQueue.findIndex((_, i) => `track-${i}` === active.id);
-      const newIndex = optimisticQueue.findIndex((_, i) => `track-${i}` === over.id);
+      const oldIndex = optimisticQueue.findIndex((item, i) => getQueueItemId(item, i) === active.id);
+      const newIndex = optimisticQueue.findIndex((item, i) => getQueueItemId(item, i) === over.id);
       if (oldIndex === -1 || newIndex === -1) return;
 
       if (sendCommand('move', { from: oldIndex, to: newIndex })) {
@@ -163,18 +187,18 @@ export default function QueuePage() {
       await api.post('/favorites', {
         track_title: getTitle(track),
         track_author: getAuthor(track),
-        track_url: (track as any).track_url || track.url || track.identifier || 'unknown',
-        track_identifier: track.identifier || (track as any).track_identifier || null,
+        track_url: getTrackUrl(track),
+        track_identifier: getTrackIdentifier(track),
         duration_ms: track.duration_ms || track.duration || 0,
-        source: track.source || (track as any).source || 'unknown',
-        artwork_url: track.artwork_url || (track as any).artworkUrl || null,
+        source: track.source || 'unknown',
+        artwork_url: getArtworkUrl(track),
       });
       toast.success('Added to Favorites');
-    } catch (error: any) {
-      if (error.response?.status === 409 || error.response?.status === 400) {
+    } catch (error: unknown) {
+      if (error instanceof ApiError && (error.status === 409 || error.status === 400)) {
         toast.info('Already in Favorites');
       } else {
-        toast.error(`Failed to add to favorites: ${error.message || 'Unknown error'}`);
+        toast.error(getErrorMessage(error, 'Failed to add to favorites'));
       }
     }
   };
@@ -190,19 +214,19 @@ export default function QueuePage() {
       await api.post(`/playlists/${playlistId}/tracks`, {
         track_title: getTitle(targetTrack),
         track_author: getAuthor(targetTrack),
-        track_url: (targetTrack as any).track_url || targetTrack.url || targetTrack.identifier || 'unknown',
-        track_identifier: targetTrack.identifier || (targetTrack as any).track_identifier || null,
+        track_url: getTrackUrl(targetTrack),
+        track_identifier: getTrackIdentifier(targetTrack),
         duration_ms: targetTrack.duration_ms || targetTrack.duration || 0,
-        source: targetTrack.source || (targetTrack as any).source || 'unknown',
-        artwork_url: targetTrack.artwork_url || (targetTrack as any).artworkUrl || null,
+        source: targetTrack.source || 'unknown',
+        artwork_url: getArtworkUrl(targetTrack),
       });
       setShowPlaylistMenu(false);
       toast.success('Added to Playlist');
-    } catch (error: any) {
-      if (error.response?.status === 409 || error.response?.status === 400) {
+    } catch (error: unknown) {
+      if (error instanceof ApiError && (error.status === 409 || error.status === 400)) {
         toast.info('Already in Playlist');
       } else {
-        toast.error('Failed to add to playlist');
+        toast.error(getErrorMessage(error, 'Failed to add to playlist'));
       }
     }
   };
@@ -274,11 +298,12 @@ export default function QueuePage() {
               <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-4">{optimisticQueue.length} Tracks in Queue</p>
 
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={optimisticQueue.map((_, i) => `track-${i}`)} strategy={verticalListSortingStrategy}>
+                  <SortableContext items={optimisticQueue.map((item, i) => getQueueItemId(item, i))} strategy={verticalListSortingStrategy}>
                   <div className="space-y-2">
                     {optimisticQueue.map((item, index) => (
                       <SortableQueueItem
-                        key={`track-${index}`}
+                        key={getQueueItemId(item, index)}
+                        itemId={getQueueItemId(item, index)}
                         index={index}
                         item={item}
                         onRemove={() => handleRemove(index)}

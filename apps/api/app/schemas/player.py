@@ -5,9 +5,12 @@ from pydantic import BaseModel, Field
 
 class QueueTrackResponse(BaseModel):
     position: int = 0
+    queue_id: str | None = None
     track_title: str = ""
     track_author: str | None = None
     track_url: str = ""
+    track_identifier: str | None = None
+    source: str | None = None
     duration_ms: int | None = None
     artwork_url: str | None = None
     requested_by: str | None = None
@@ -31,9 +34,12 @@ def normalize_bot_state(raw: dict) -> dict:
     def normalize_track(t: dict, idx: int = 0) -> dict:
         return {
             "position": t.get("position", idx),
+            "queue_id": t.get("queueId", t.get("queue_id")),
             "track_title": t.get("title", t.get("track_title", "")),
             "track_author": t.get("author", t.get("track_author")),
             "track_url": t.get("url", t.get("track_url", "")),
+            "track_identifier": t.get("identifier", t.get("track_identifier")),
+            "source": t.get("source"),
             "duration_ms": t.get("duration", t.get("duration_ms")),
             "artwork_url": t.get("artworkUrl", t.get("artwork_url")),
             "requested_by": t.get("requestedBy", t.get("requested_by")),

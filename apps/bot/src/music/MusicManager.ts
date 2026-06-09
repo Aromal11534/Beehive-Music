@@ -5,9 +5,11 @@
 import { Client } from 'discord.js';
 import { Shoukaku, Connectors, Player, LoadType, type LavalinkResponse, type Node, type NodeOption, type Track } from 'shoukaku';
 import { config } from '../config';
-import { QueueManager } from './QueueManager';
+import { QueueManager, QueueSnapshot } from './QueueManager';
 import { QueueTrack, GuildPlayerState } from '../types';
 import { RedisService } from '../services/RedisService';
+
+const QUEUE_STATE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 export class MusicManager {
   public shoukaku: Shoukaku;
@@ -25,8 +27,7 @@ export class MusicManager {
       { name: 'local', url: `${config.lavalink.host}:${config.lavalink.port}`, auth: config.lavalink.password, secure: false, group: 'primary' },
       { name: 'serenetia', url: 'lavalinkv4.serenetia.com:443', auth: 'https://seretia.link/discord', secure: true, group: 'public' },
       { name: 'jirayu', url: 'lavalink.jirayu.net:443', auth: 'youshallnotpass', secure: true, group: 'public' },
-      { name: 'millohost', url: 'lava-v4.millohost.my.id:443', auth: 'https://discord.gg/mjS5J2K3ep', secure: true, group: 'public' },
-      { name: 'triniumhost', url: 'lavalink-v4.triniumhost.com:443', auth: 'free', secure: true, group: 'public' }
+      { name: 'millohost', url: 'lava-v4.millohost.my.id:443', auth: 'https://discord.gg/mjS5J2K3ep', secure: true, group: 'public' }
     ];
 
     this.shoukaku = new Shoukaku(new Connectors.DiscordJS(client), [], {
@@ -146,6 +147,57 @@ export class MusicManager {
       this.queues.set(guildId, new QueueManager());
     }
     return this.queues.get(guildId)!;
+  }
+
+  private getQueueStateKey(guildId: string): string {
+    return `queue:${guildId}`;
+  }
+
+  private isQueueSnapshot(value: unknown): value is QueueSnapshot {
+    if (!value || typeof value !== 'object') return false;
+    const snapshot = value as Partial<QueueSnapshot>;
+    return snapshot.version === 1
+      && Array.isArray(snapshot.tracks)
+      && Array.isArray(snapshot.history)
+      && (snapshot.current === null || typeof snapshot.current === 'object')
+      && ['off', 'track', 'queue'].includes(snapshot.loopMode as string)
+      && typeof snapshot.volume === 'number';
+  }
+
+  async restoreQueues(guildIds: Iterable<string>): Promise<void> {
+    for (const guildId of guildIds) {
+      try {
+        const cached = await this.redis.get(this.getQueueStateKey(guildId));
+        if (!cached) continue;
+
+        const snapshot = JSON.parse(cached) as unknown;
+        if (!this.isQueueSnapshot(snapshot)) {
+          console.warn(`[Queue] Ignoring invalid cached queue for guild ${guildId}`);
+          continue;
+        }
+
+        const queue = QueueManager.fromSnapshot(snapshot);
+        this.queues.set(guildId, queue);
+        await this.publishState(guildId);
+        console.log(`[Queue] Restored ${queue.length} queued track(s) for guild ${guildId}`);
+      } catch (error) {
+        console.error(`[Queue] Failed to restore queue for guild ${guildId}:`, error);
+      }
+    }
+  }
+
+  private async persistQueue(guildId: string): Promise<void> {
+    const queue = this.getQueue(guildId);
+    if (!queue.current && queue.tracks.length === 0 && queue.history.length === 0) {
+      await this.redis.del(this.getQueueStateKey(guildId));
+      return;
+    }
+
+    await this.redis.set(
+      this.getQueueStateKey(guildId),
+      JSON.stringify(queue.toSnapshot()),
+      QUEUE_STATE_TTL_SECONDS
+    );
   }
 
   async joinChannel(guildId: string, channelId: string): Promise<Player> {
@@ -330,6 +382,7 @@ export class MusicManager {
   async publishState(guildId: string): Promise<void> {
     const state = this.getState(guildId);
     try {
+      await this.persistQueue(guildId);
       await this.redis.publish(`player:${guildId}`, JSON.stringify(state));
       await this.redis.set(`player_state:${guildId}`, JSON.stringify(state), 3600);
     } catch (e) {

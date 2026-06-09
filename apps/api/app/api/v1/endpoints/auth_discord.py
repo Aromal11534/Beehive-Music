@@ -15,6 +15,28 @@ from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth/discord", tags=["auth-discord"])
 
+DISCORD_PERMISSION_ADMINISTRATOR = 0x8
+DISCORD_PERMISSION_MANAGE_GUILD = 0x20
+
+
+def _discord_guild_role(guild: dict[str, Any]) -> str:
+    """Map Discord guild permissions to Beehive guild access."""
+    if guild.get("owner"):
+        return "admin"
+
+    try:
+        permissions = int(guild.get("permissions") or 0)
+    except (TypeError, ValueError):
+        permissions = 0
+
+    if permissions & (DISCORD_PERMISSION_ADMINISTRATOR | DISCORD_PERMISSION_MANAGE_GUILD):
+        return "admin"
+    return "viewer"
+
+
+def _role_rank(role: str | None) -> int:
+    return {"viewer": 0, "dj": 1, "moderator": 2, "admin": 3}.get(role or "viewer", 0)
+
 class DiscordSyncRequest(BaseModel):
     code: str
     redirect_uri: str
@@ -141,7 +163,8 @@ async def sync_discord_account(
             raise HTTPException(status_code=400, detail="Failed to fetch Discord guilds.")
             
         discord_guilds = guilds_response.json()
-        user_guild_ids = [g["id"] for g in discord_guilds]
+        guild_roles = {g["id"]: _discord_guild_role(g) for g in discord_guilds if g.get("id")}
+        user_guild_ids = list(guild_roles.keys())
         print(f"DISCORD GUILDS FETCHED: {len(user_guild_ids)}", flush=True)
         print(f"FIRST 5 GUILDS: {user_guild_ids[:5]}", flush=True)
         
@@ -154,6 +177,7 @@ async def sync_discord_account(
         
         synced_count = 0
         for bot_guild in bot_guilds:
+            desired_role = guild_roles.get(bot_guild.discord_guild_id, "viewer")
             # Check if user already has access
             existing = await db.execute(
                 select(UserGuildAccess).where(
@@ -161,13 +185,17 @@ async def sync_discord_account(
                     UserGuildAccess.guild_id == bot_guild.id
                 )
             )
-            if not existing.scalar_one_or_none():
+            existing_access = existing.scalar_one_or_none()
+            if not existing_access:
                 access = UserGuildAccess(
                     user_id=current_user.id,
                     guild_id=bot_guild.id,
-                    role="viewer"
+                    role=desired_role
                 )
                 db.add(access)
+                synced_count += 1
+            elif _role_rank(desired_role) > _role_rank(existing_access.role):
+                existing_access.role = desired_role
                 synced_count += 1
             else:
                 print(f"User already has access to {bot_guild.name}", flush=True)
