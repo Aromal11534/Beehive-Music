@@ -30,6 +30,9 @@ These credentials allow the application to control, run, and identify your Disco
 *   **`DISCORD_CLIENT_ID`**
     *   **What it is:** The public identification tag for your Discord application.
     *   **How to get it:** In the Developer Portal, go to the **OAuth2** -> **General** tab and copy the **Client ID**.
+*   **`NEXT_PUBLIC_DISCORD_REDIRECT_URI`**
+    *   **What it is:** The exact browser callback used for Discord login and account sync.
+    *   **How to configure it:** Add the same value under **OAuth2** -> **Redirects** in the Discord Developer Portal. For local Docker development use `http://localhost:3000/auth/discord/callback`; production should use `https://beehive.teamsyndicate.org/auth/discord/callback`.
 *   **`DISCORD_DEV_GUILD_ID`** *(Optional)*
     *   **What it is:** The Server ID of your personal testing server. Using this makes Slash Commands update instantly during development instead of taking up to an hour globally.
     *   **How to get it:** Enable "Developer Mode" in your Discord client settings (Advanced), then right-click your server's icon in Discord and click **Copy Server ID**.

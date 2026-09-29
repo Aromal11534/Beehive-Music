@@ -1,14 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import type { FavoriteTrack } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
 import { FallbackImage } from '@/components/FallbackImage';
-import Image from 'next/image';
 import { BackgroundWaveform } from '@/components/BackgroundWaveform';
 import { usePlayer } from '@/context/PlayerContext';
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
 
 export default function FavoritesPage() {
   const [favorites, setFavorites] = useState<FavoriteTrack[]>([]);
@@ -19,7 +24,7 @@ export default function FavoritesPage() {
   const isPlaying = !!(state && state.is_playing && !state.is_paused);
 
   useEffect(() => {
-    loadFavorites();
+    api.get<FavoriteTrack[]>('/favorites').then(setFavorites).catch(() => {});
   }, []);
 
   const [shuffleEnabled, setShuffleEnabled] = useState(true);
@@ -27,10 +32,6 @@ export default function FavoritesPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
-
-  const loadFavorites = () => {
-    api.get<FavoriteTrack[]>('/favorites').then(setFavorites).catch(() => {});
-  };
 
   const importFavorites = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,8 +43,8 @@ export default function FavoritesPage() {
       setFavorites(response);
       setImportUrl('');
       setShowImportModal(false);
-    } catch (err: any) {
-      alert(err.response?.data?.detail || "Failed to import tracks to favorites.");
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, 'Failed to import tracks to favorites.'));
     } finally {
       setImporting(false);
     }
@@ -94,7 +95,7 @@ export default function FavoritesPage() {
       return alert("Your favorites list is empty.");
     }
     
-    let tracksToSend = [...favorites];
+    const tracksToSend = [...favorites];
     
     if (shuffleEnabled) {
       for (let i = tracksToSend.length - 1; i > 0; i--) {

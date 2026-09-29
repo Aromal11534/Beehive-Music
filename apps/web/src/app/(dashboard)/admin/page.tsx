@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { api, getApiBase } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import type { User } from '@/lib/types';
 import { Icon } from '@/components/icons';
 
@@ -86,7 +87,7 @@ export default function AdminPage() {
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-amber-400 text-sm font-semibold overflow-hidden shrink-0">
                       {avatarUrl ? (
-                        <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                        <Image src={avatarUrl} alt="Avatar" width={32} height={32} unoptimized className="w-full h-full object-cover" />
                       ) : (
                         u.display_name?.[0]?.toUpperCase()
                       )}

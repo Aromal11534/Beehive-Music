@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { getDiscordOAuthUrl } from '@/lib/discord-oauth';
 import type { GuildAccess } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import Link from 'next/link';
@@ -22,11 +23,7 @@ function getDiscordInviteUrl() {
 }
 
 function getDiscordConnectUrl() {
-  const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID;
-  if (!clientId || typeof window === 'undefined') return null;
-
-  const redirectUri = encodeURIComponent(`${window.location.origin}/auth/discord/callback`);
-  return `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=identify%20guilds%20email&state=sync`;
+  return getDiscordOAuthUrl('sync');
 }
 
 export default function ServersPage() {

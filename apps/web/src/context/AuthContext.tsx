@@ -40,14 +40,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('beehive_access_token');
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
     let isMounted = true;
     async function loadUser() {
+      await Promise.resolve();
+      const token = localStorage.getItem('beehive_access_token');
+      if (!token) {
+        if (isMounted) setIsLoading(false);
+        return;
+      }
+
       try {
         const userData = await api.get<User>('/users/me');
         if (isMounted) setUser(userData);
@@ -139,4 +140,3 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
-

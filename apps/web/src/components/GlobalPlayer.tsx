@@ -8,7 +8,7 @@ import { FallbackImage } from '@/components/FallbackImage';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
 import type { PlayerTrack, PlaylistSummary } from '@/lib/types';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 
 function getTrackTitle(track: PlayerTrack | null | undefined) {
   return track?.title || track?.track_title || 'Unknown Track';
@@ -18,6 +18,10 @@ function getTrackAuthor(track: PlayerTrack | null | undefined) {
   return track?.author || track?.track_author || 'Unknown Artist';
 }
 
+function isDuplicateError(error: unknown) {
+  return error instanceof ApiError && (error.status === 409 || error.status === 400);
+}
+
 export function GlobalPlayer() {
   const { state, localPosition, isDraggingRef, sendCommand, commitSeek, handleVolumeChange } = usePlayer();
   const { guilds, selectedGuild } = useGuilds();
@@ -25,11 +29,9 @@ export function GlobalPlayer() {
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [localVolume, setLocalVolume] = useState<number | null>(null);
-  const [mounted, setMounted] = useState(false);
   const [localSeek, setLocalSeek] = useState<number | null>(null);
 
   useEffect(() => {
-    setMounted(true);
     api.get<PlaylistSummary[]>('/playlists').then((data) => {
       setPlaylists(Array.isArray(data) ? data : []);
     }).catch(() => { });
@@ -59,15 +61,15 @@ export function GlobalPlayer() {
       await api.post('/favorites', {
         track_title: currentTitle || 'Unknown Title',
         track_author: currentAuthor || 'Unknown Artist',
-        track_url: (track as any).track_url || track.url || track.identifier || 'unknown',
-        track_identifier: track.identifier || (track as any).track_identifier || null,
+        track_url: track.track_url || track.url || track.identifier || 'unknown',
+        track_identifier: track.identifier || track.track_identifier || null,
         duration_ms: duration || 0,
-        source: track.source || (track as any).source || 'unknown',
-        artwork_url: track.artwork_url || (track as any).artworkUrl || null,
+        source: track.source || 'unknown',
+        artwork_url: track.artwork_url || track.artworkUrl || null,
       });
       showActionFeedback('Added to Favorites');
-    } catch (error: any) {
-      if (error.response?.status === 409 || error.response?.status === 400) {
+    } catch (error: unknown) {
+      if (isDuplicateError(error)) {
         toast.info('Already in Favorites');
       } else {
         console.error('Add to favorites error:', error);
@@ -82,16 +84,16 @@ export function GlobalPlayer() {
       await api.post(`/playlists/${playlistId}/tracks`, {
         track_title: currentTitle || 'Unknown Title',
         track_author: currentAuthor || 'Unknown Artist',
-        track_url: (track as any).track_url || track.url || track.identifier || 'unknown',
-        track_identifier: track.identifier || (track as any).track_identifier || null,
+        track_url: track.track_url || track.url || track.identifier || 'unknown',
+        track_identifier: track.identifier || track.track_identifier || null,
         duration_ms: track.duration_ms || track.duration || duration || 0,
-        source: track.source || (track as any).source || 'unknown',
-        artwork_url: track.artwork_url || (track as any).artworkUrl || null,
+        source: track.source || 'unknown',
+        artwork_url: track.artwork_url || track.artworkUrl || null,
       });
       setShowPlaylistMenu(false);
       showActionFeedback('Added to Playlist');
-    } catch (error: any) {
-      if (error.response?.status === 409 || error.response?.status === 400) {
+    } catch (error: unknown) {
+      if (isDuplicateError(error)) {
         toast.info('Already in Playlist');
       } else {
         console.error('Add to playlist error:', error);
@@ -206,7 +208,7 @@ export function GlobalPlayer() {
         </div>
       </div>
 
-      {showPlaylistMenu && mounted && createPortal(
+      {showPlaylistMenu && createPortal(
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) setShowPlaylistMenu(false) }}>
           <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-zinc-900 border border-white/10 shadow-2xl flex flex-col">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(245,158,11,0.15),_transparent_80%)] pointer-events-none" />

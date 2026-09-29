@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import type { Guild, TrackHistoryEntry } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import { BackgroundWaveform } from '@/components/BackgroundWaveform';
@@ -68,9 +68,9 @@ export default function ServerDashboardPage() {
           if (settingsRes.status === 'fulfilled') setSettings(settingsRes.value);
         });
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to load server data:', err);
-        if (err.response?.status === 403) {
+        if (err instanceof ApiError && err.status === 403) {
           router.push('/servers');
         }
       } finally {
@@ -94,7 +94,7 @@ export default function ServerDashboardPage() {
       <div className="flex flex-col items-center justify-center h-64 text-center">
         <Icon name="server" className="w-12 h-12 text-zinc-600 mb-4" />
         <h2 className="text-xl font-semibold text-zinc-300">Server Not Found</h2>
-        <p className="text-zinc-500 mt-2">This server does not exist or you don't have access.</p>
+        <p className="text-zinc-500 mt-2">This server does not exist or you don&apos;t have access.</p>
         <Link href="/servers" className="mt-4 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors">
           Go Back
         </Link>

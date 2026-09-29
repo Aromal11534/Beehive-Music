@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
+import Image from 'next/image';
 import { Icon, type IconName } from '@/components/icons';
 
 interface FallbackImageProps {
   src?: string | null;
   alt?: string;
-  fill?: boolean;
   className?: string;
   sizes?: string;
   fallbackIcon?: IconName;
@@ -14,33 +14,38 @@ interface FallbackImageProps {
 export function FallbackImage({ 
   src, 
   alt = "", 
-  fill = true, 
   className = "", 
   sizes,
   fallbackIcon = "music",
   fallbackClassName = "text-emerald-500/50 bg-zinc-800"
 }: FallbackImageProps) {
-  const [error, setError] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const imgRef = useRef<HTMLImageElement>(null);
-
-  // YouTube's maxresdefault.jpg frequently 404s for non-1080p videos.
   const optimizedSrc = src?.replace('maxresdefault.jpg', 'mqdefault.jpg');
 
-  // Reset state when the image source changes
-  useEffect(() => {
-    setError(false);
-    setLoading(true);
-  }, [src]);
+  return (
+    <FallbackImageSource
+      key={optimizedSrc || 'missing-image'}
+      src={optimizedSrc}
+      alt={alt}
+      className={className}
+      sizes={sizes}
+      fallbackIcon={fallbackIcon}
+      fallbackClassName={fallbackClassName}
+    />
+  );
+}
 
-  // Check if image is already loaded from cache to prevent perpetual loading state
-  useEffect(() => {
-    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
-      setLoading(false);
-    }
-  }, [optimizedSrc]);
+function FallbackImageSource({
+  src,
+  alt,
+  className,
+  sizes,
+  fallbackIcon,
+  fallbackClassName,
+}: Required<Pick<FallbackImageProps, 'alt' | 'className' | 'fallbackIcon' | 'fallbackClassName'>> & Pick<FallbackImageProps, 'src' | 'sizes'>) {
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(Boolean(src));
 
-  if (!optimizedSrc || error) {
+  if (!src || error) {
     return (
       <div className={`absolute inset-0 flex h-full w-full items-center justify-center ${fallbackClassName}`}>
         <Icon name={fallbackIcon} className="h-1/2 w-1/2" />
@@ -55,11 +60,13 @@ export function FallbackImage({
           <Icon name={fallbackIcon} className="h-1/2 w-1/2 opacity-30" />
         </div>
       )}
-      <img 
-        ref={imgRef}
-        src={optimizedSrc} 
+      <Image
+        src={src}
         alt={alt} 
-        className={`${className} transition-opacity duration-150 ${loading ? 'opacity-0' : 'opacity-100'} ${fill ? 'absolute inset-0 w-full h-full' : ''}`} 
+        fill
+        sizes={sizes}
+        unoptimized
+        className={`${className} absolute inset-0 h-full w-full transition-opacity duration-150 ${loading ? 'opacity-0' : 'opacity-100'}`}
         onLoad={() => setLoading(false)}
         onError={() => {
           setError(true);

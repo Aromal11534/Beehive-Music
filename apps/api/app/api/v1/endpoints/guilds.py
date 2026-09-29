@@ -7,7 +7,11 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.config import get_settings as get_app_settings
 from app.core.exceptions import AuthenticationError
-from app.api.v1.deps import get_current_user, get_admin_user
+from app.api.v1.deps import (
+    get_current_user,
+    get_admin_user,
+    require_guild_access_by_id,
+)
 from app.schemas.guild import (
     GuildCreate, GuildUpdate, GuildResponse, GuildAccessCreate, GuildAccessResponse,
     ServerSettingsUpdate, ServerSettingsResponse, GuildStatsResponse,
@@ -86,8 +90,7 @@ async def get_guild(
     db: AsyncSession = Depends(get_db),
 ):
     """Get guild details."""
-    service = GuildService(db)
-    return await service.get_guild(guild_id)
+    return await require_guild_access_by_id(guild_id, current_user, db)
 
 
 @router.patch("/{guild_id}", response_model=GuildResponse)
@@ -122,15 +125,12 @@ async def leave_guild(
 ):
     """Tell the bot to leave a server and delete its data (Server admin or global admin)."""
     service = GuildService(db)
-    
-    # Check access
-    if not current_user.is_admin:
-        access = await service.check_access(current_user.id, guild_id)
-        if not access or access.role != "admin":
-            from fastapi import HTTPException
-            raise HTTPException(status_code=403, detail="Not authorized to remove bot from this server")
-            
-    guild = await service.get_guild(guild_id)
+    guild = await require_guild_access_by_id(
+        guild_id,
+        current_user,
+        db,
+        allowed_roles={"admin"},
+    )
     
     # Publish to Redis so the bot actually leaves the Discord server
     import json
@@ -179,6 +179,7 @@ async def get_settings(
     db: AsyncSession = Depends(get_db),
 ):
     """Get server settings for a guild."""
+    await require_guild_access_by_id(guild_id, current_user, db)
     service = GuildService(db)
     return await service.get_settings(guild_id)
 
@@ -191,6 +192,12 @@ async def update_settings(
     db: AsyncSession = Depends(get_db),
 ):
     """Update server settings."""
+    await require_guild_access_by_id(
+        guild_id,
+        current_user,
+        db,
+        allowed_roles={"admin"},
+    )
     service = GuildService(db)
     return await service.update_settings(guild_id, **data.model_dump(exclude_unset=True))
 
@@ -202,15 +209,8 @@ async def list_guild_playlists(
     db: AsyncSession = Depends(get_db),
 ):
     """List server playlists for a guild."""
-    service = GuildService(db)
-    
-    # Check access
-    if not current_user.is_admin:
-        access = await service.check_access(current_user.id, guild_id)
-        if not access:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=403, detail="No access to this guild")
-            
+    await require_guild_access_by_id(guild_id, current_user, db)
+
     from app.services.playlist_service import PlaylistService
     playlist_service = PlaylistService(db)
     playlists = await playlist_service.list_guild_playlists(guild_id)
@@ -231,15 +231,13 @@ async def get_guild_stats(
     db: AsyncSession = Depends(get_db),
 ):
     """Get statistics for a specific server (Admin only)."""
-    service = GuildService(db)
-    
-    # Check access
-    if not current_user.is_admin:
-        access = await service.check_access(current_user.id, guild_id)
-        if not access or access.role != "admin":
-            from fastapi import HTTPException
-            raise HTTPException(status_code=403, detail="No admin access to this guild")
-            
+    await require_guild_access_by_id(
+        guild_id,
+        current_user,
+        db,
+        allowed_roles={"admin"},
+    )
+
     from sqlalchemy import select, func
     from app.models.history import PlayHistory
     from app.models.playlist import Playlist

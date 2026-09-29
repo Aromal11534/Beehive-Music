@@ -8,6 +8,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.core.config import get_settings
+from app.core.logging_filters import SensitiveQueryFilter
 from app.core.redis import close_redis
 from app.core.rate_limit import limiter
 from app.api.v1.router import api_router
@@ -24,7 +25,11 @@ def _configure_logging():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     # Suppress noisy third-party loggers
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    credential_filter = SensitiveQueryFilter()
+    uvicorn_access_logger = logging.getLogger("uvicorn.access")
+    uvicorn_access_logger.setLevel(logging.WARNING)
+    uvicorn_access_logger.addFilter(credential_filter)
+    logging.getLogger("uvicorn.error").addFilter(credential_filter)
     logging.getLogger("sqlalchemy.engine").setLevel(
         logging.INFO if settings.debug else logging.WARNING
     )
@@ -82,4 +87,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

@@ -1,14 +1,28 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
-import type { PlaylistSummary, PlaylistDetail, PlaylistTrack } from '@/lib/types';
+import type { PlayerTrack, PlaylistSummary, PlaylistDetail, PlaylistTrack } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
 import { FallbackImage } from '@/components/FallbackImage';
 import { usePlayer } from '@/context/PlayerContext';
 import { BackgroundWaveform } from '@/components/BackgroundWaveform';
+
+type DisplayPlaylist = Omit<PlaylistDetail, 'id'> & { id: number | string };
+
+interface CreatePlaylistPayload {
+  name: string;
+  playlist_type: 'personal' | 'server';
+  owner_guild_id?: number;
+}
+
+interface ImportPlaylistPayload {
+  url: string;
+  playlist_type: 'personal' | 'server';
+  owner_guild_id?: number;
+}
 
 function PlaylistsContent() {
   const [personalPlaylists, setPersonalPlaylists] = useState<PlaylistSummary[]>([]);
@@ -40,46 +54,59 @@ function PlaylistsContent() {
   const router = useRouter();
   const initialId = searchParams.get('id');
   const initialName = searchParams.get('name');
+  const initialType = searchParams.get('type');
 
-  const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistDetail | null>(
+  const [selectedPlaylist, setSelectedPlaylist] = useState<DisplayPlaylist | null>(
     initialId && initialName ? {
-      id: Number(initialId),
+      id: initialType === 'dynamic' ? initialId : Number(initialId),
       name: initialName,
       playlist_type: 'server',
       tracks: []
-    } as unknown as PlaylistDetail : null
+    } : null
   );
 
-  const loadPlaylists = async () => {
+  const fetchPlaylists = useCallback(async () => {
+    let personal: PlaylistSummary[] = [];
+    let server: PlaylistSummary[] = [];
+
     try {
-      const p = await api.get<PlaylistSummary[]>('/playlists');
-      setPersonalPlaylists(p);
+      personal = await api.get<PlaylistSummary[]>('/playlists');
     } catch { }
 
     if (selectedGuild) {
       const g = guilds.find(g => g.guild?.discord_guild_id === selectedGuild);
       if (g && g.guild_id) {
         try {
-          const s = await api.get<PlaylistSummary[]>(`/guilds/${g.guild_id}/playlists`);
-          setServerPlaylists(s);
+          server = await api.get<PlaylistSummary[]>(`/guilds/${g.guild_id}/playlists`);
         } catch { }
-      } else {
-        setServerPlaylists([]);
       }
-    } else {
-      setServerPlaylists([]);
     }
-  };
+
+    return { personal, server };
+  }, [selectedGuild, guilds]);
+
+  const loadPlaylists = useCallback(async () => {
+    const { personal, server } = await fetchPlaylists();
+    setPersonalPlaylists(personal);
+    setServerPlaylists(server);
+  }, [fetchPlaylists]);
 
   useEffect(() => {
-    loadPlaylists();
-  }, [selectedGuild, guilds]);
+    let cancelled = false;
+    void fetchPlaylists().then(({ personal, server }) => {
+      if (!cancelled) {
+        setPersonalPlaylists(personal);
+        setServerPlaylists(server);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [fetchPlaylists]);
 
   const createPlaylist = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
 
-    const payload: any = { name: newName, playlist_type: activeTab };
+    const payload: CreatePlaylistPayload = { name: newName, playlist_type: activeTab };
 
     if (activeTab === 'server') {
       const g = guilds.find(g => g.guild?.discord_guild_id === selectedGuild);
@@ -110,7 +137,7 @@ function PlaylistsContent() {
       if (selectedPlaylist && typeof selectedPlaylist.id === 'number') {
         p = await api.post<PlaylistDetail>(`/playlists/${selectedPlaylist.id}/import`, { url: importUrl });
       } else {
-        const payload: any = { url: importUrl, playlist_type: activeTab };
+        const payload: ImportPlaylistPayload = { url: importUrl, playlist_type: activeTab };
         if (activeTab === 'server') {
           const g = guilds.find(g => g.guild?.discord_guild_id === selectedGuild);
           if (!g || !g.guild_id) {
@@ -147,49 +174,67 @@ function PlaylistsContent() {
     }
   };
 
-  const initialType = searchParams.get('type');
   const { state } = usePlayer();
   const track = state?.current_track;
   const isPlaying = !!(state && state.is_playing && !state.is_paused);
-  const queue = state?.queue || [];
+  const queue = state?.queue;
 
   useEffect(() => {
-    if (initialType === 'dynamic' && initialId && initialName) {
-      const featuredTracks = track ? [track, ...queue].slice(0, 6) : queue.slice(0, 6);
-      let tracksData: any[] = [];
+    let cancelled = false;
 
-      if (initialId === 'daily-mix') {
-        tracksData = featuredTracks;
-      } else if (initialId === 'quick-picks') {
-        tracksData = queue.slice(0, 8).reverse();
-      } else if (initialId === 'listen-again') {
-        tracksData = queue.slice(2, 10);
+    async function syncSelectedPlaylist() {
+      await Promise.resolve();
+      if (cancelled) return;
+
+      if (initialType === 'dynamic' && initialId && initialName) {
+        const currentQueue = queue ?? [];
+        const featuredTracks = track ? [track, ...currentQueue].slice(0, 6) : currentQueue.slice(0, 6);
+        let tracksData: PlayerTrack[] = [];
+
+        if (initialId === 'daily-mix') {
+          tracksData = featuredTracks;
+        } else if (initialId === 'quick-picks') {
+          tracksData = currentQueue.slice(0, 8).reverse();
+        } else if (initialId === 'listen-again') {
+          tracksData = currentQueue.slice(2, 10);
+        }
+
+        setSelectedPlaylist({
+          id: initialId,
+          name: initialName,
+          playlist_type: 'server',
+          track_count: tracksData.length,
+          tracks: tracksData.map((item, index) => {
+            const trackUrl = item.track_url || item.url || '';
+            return {
+              id: index,
+              playlist_id: initialId,
+              track_title: item.track_title || item.title || 'Unknown Track',
+              track_author: item.track_author || item.author || 'Unknown Artist',
+              track_url: trackUrl,
+              track_identifier: item.track_identifier || item.identifier || trackUrl,
+              source: item.source || (trackUrl.includes('spotify') ? 'spotify' : 'youtube'),
+              duration_ms: item.duration_ms || item.duration || 0,
+              artwork_url: item.artwork_url || item.artworkUrl || '',
+              position: index,
+              added_at: new Date().toISOString(),
+            };
+          }),
+        });
+      } else if (initialId) {
+        try {
+          const data = await api.get<PlaylistDetail>(`/playlists/${Number(initialId)}`);
+          if (!cancelled) setSelectedPlaylist(data);
+        } catch {
+          if (!cancelled) setSelectedPlaylist(null);
+        }
+      } else {
+        setSelectedPlaylist(null);
       }
-
-      setSelectedPlaylist({
-        id: initialId as any,
-        name: initialName,
-        playlist_type: 'server',
-        track_count: tracksData.filter(Boolean).length,
-        tracks: tracksData.filter(Boolean).map((t, i) => ({
-          id: i,
-          playlist_id: initialId as any,
-          track_title: t.track_title || 'Unknown Track',
-          track_author: t.track_author || 'Unknown Artist',
-          track_url: t.track_url || '',
-          track_identifier: t.track_identifier || t.track_url || '',
-          source: t.source || (t.track_url?.includes('spotify') ? 'spotify' : 'youtube'),
-          duration_ms: t.duration_ms || 0,
-          artwork_url: t.artwork_url || '',
-          position: i,
-          added_at: new Date().toISOString()
-        }))
-      });
-    } else if (initialId) {
-      loadPlaylist(Number(initialId));
-    } else {
-      setSelectedPlaylist(null);
     }
+
+    void syncSelectedPlaylist();
+    return () => { cancelled = true; };
   }, [initialId, initialName, initialType, track, queue]);
 
   const formatDuration = (ms: number) => {
@@ -223,7 +268,7 @@ function PlaylistsContent() {
 
   const handleRemoveTrack = async (trackId: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!selectedPlaylist) return;
+    if (!selectedPlaylist || typeof selectedPlaylist.id !== 'number') return;
     try {
       await api.delete(`/playlists/${selectedPlaylist.id}/tracks/${trackId}`);
       loadPlaylist(selectedPlaylist.id);
@@ -238,7 +283,7 @@ function PlaylistsContent() {
       return alert("This playlist is empty.");
     }
 
-    let tracksToSend = [...selectedPlaylist.tracks];
+    const tracksToSend = [...selectedPlaylist.tracks];
 
     if (shuffleEnabled) {
       for (let i = tracksToSend.length - 1; i > 0; i--) {
@@ -269,7 +314,7 @@ function PlaylistsContent() {
   };
 
   const executeDeletePlaylist = async () => {
-    if (!selectedPlaylist) return;
+    if (!selectedPlaylist || typeof selectedPlaylist.id !== 'number') return;
 
     try {
       await api.delete(`/playlists/${selectedPlaylist.id}`);
@@ -495,7 +540,7 @@ function PlaylistsContent() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {displayedPlaylists.map((p) => (
                           <div key={p.id} onClick={() => {
-                            setSelectedPlaylist({ id: p.id, name: p.name, playlist_type: p.playlist_type, tracks: [] } as unknown as PlaylistDetail);
+                            setSelectedPlaylist({ id: p.id, name: p.name, playlist_type: p.playlist_type, tracks: [] });
                             loadPlaylist(p.id);
                           }} className="group rounded-2xl bg-white/5 p-5 ring-1 ring-white/5 transition hover:bg-white/10 hover:ring-emerald-500/30 cursor-pointer">
                             <div className="w-14 h-14 rounded-xl bg-black/40 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform text-emerald-400 overflow-hidden relative shadow-inner shrink-0">

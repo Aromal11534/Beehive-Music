@@ -72,6 +72,38 @@ async def require_guild_access_by_discord_id(
     if not guild:
         raise NotFoundError("Guild not found")
 
+    return await _require_guild_access(guild, current_user, db)
+
+
+async def require_guild_access_by_id(
+    guild_id: int,
+    current_user: User,
+    db: AsyncSession,
+    allowed_roles: set[str] | None = None,
+) -> DiscordGuild:
+    """Authorize access to a Discord guild identified by its database ID."""
+    result = await db.execute(
+        select(DiscordGuild).where(DiscordGuild.id == guild_id)
+    )
+    guild = result.scalar_one_or_none()
+    if not guild:
+        raise NotFoundError("Guild not found")
+
+    return await _require_guild_access(
+        guild,
+        current_user,
+        db,
+        allowed_roles=allowed_roles,
+    )
+
+
+async def _require_guild_access(
+    guild: DiscordGuild,
+    current_user: User,
+    db: AsyncSession,
+    allowed_roles: set[str] | None = None,
+) -> DiscordGuild:
+    """Apply the shared global-admin and per-guild role policy."""
     if current_user.is_admin:
         return guild
 
@@ -81,7 +113,10 @@ async def require_guild_access_by_discord_id(
             UserGuildAccess.guild_id == guild.id,
         )
     )
-    if not access_result.scalar_one_or_none():
+    access = access_result.scalar_one_or_none()
+    if not access:
         raise AuthorizationError("You don't have access to this guild")
+    if allowed_roles is not None and access.role not in allowed_roles:
+        raise AuthorizationError("You don't have permission to perform this action")
 
     return guild

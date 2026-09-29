@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { api } from '@/lib/api';
 import type { GuildAccess } from '@/lib/types';
 import { Icon } from '@/components/icons';
@@ -148,7 +149,7 @@ export default function SearchPage() {
             <div key={`${track.identifier}-${i}`} className="glass-card p-4 flex items-center gap-4 hover:border-amber-500/20 transition">
               <div className="w-12 h-12 rounded-lg bg-zinc-700/50 flex items-center justify-center shrink-0 overflow-hidden">
                 {track.artwork_url ? (
-                  <img src={track.artwork_url} alt="" className="w-full h-full object-cover" />
+                  <Image src={track.artwork_url} alt="" width={48} height={48} unoptimized className="w-full h-full object-cover" />
                 ) : (
                   <Icon name="music" className="h-5 w-5 text-amber-400" />
                 )}

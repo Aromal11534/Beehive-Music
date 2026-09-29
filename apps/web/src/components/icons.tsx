@@ -1,4 +1,5 @@
 import type { ReactElement, SVGProps } from 'react';
+import Image from 'next/image';
 
 export type IconName =
   | 'admin'
@@ -89,6 +90,6 @@ export function Icon({ name, className = 'h-5 w-5', ...props }: SVGProps<SVGSVGE
 
 export function BrandMark({ className = 'h-5 w-5' }: { className?: string }) {
   return (
-    <img src="/beehive.png" alt="Beehive Music Logo" className={`object-contain ${className}`} />
+    <Image src="/beehive.png" alt="Beehive Music Logo" width={512} height={512} priority className={`object-contain ${className}`} />
   );
 }

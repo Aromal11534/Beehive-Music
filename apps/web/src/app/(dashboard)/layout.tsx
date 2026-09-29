@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { BrandMark, Icon, type IconName } from '@/components/icons';
 import { getApiBase } from '@/lib/api';
 import { TopSearchBar } from '@/components/TopSearchBar';
@@ -116,7 +117,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-amber-400 font-semibold overflow-hidden shrink-0">
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  <Image src={avatarUrl} alt="Avatar" width={40} height={40} unoptimized className="w-full h-full object-cover" />
                 ) : (
                   user?.display_name?.[0]?.toUpperCase() || '?'
                 )}

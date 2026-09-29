@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import type { PlayerTrack, PlaylistSummary } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
@@ -11,6 +10,8 @@ import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import Link from 'next/link';
 import { FallbackImage } from '@/components/FallbackImage';
+
+const DEFAULT_ARTIST_BIO = 'Playback is synced from your Discord server through Beehive. Manage the queue, save favorites, and jump through the track without leaving this room.';
 
 function getTrackTitle(track: PlayerTrack | null | undefined) {
   return track?.title || track?.track_title || 'Unknown Track';
@@ -27,6 +28,38 @@ function getGreeting() {
   return 'Good evening';
 }
 
+function ArtistBio({ artist }: { artist: string }) {
+  const [bio, setBio] = useState(DEFAULT_ARTIST_BIO);
+
+  useEffect(() => {
+    async function fetchBio() {
+      try {
+        const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(artist)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.extract) {
+            const words = data.extract.split(/\s+/);
+            if (words.length > 23) {
+              setBio(words.slice(0, 23).join(' ') + '...');
+            } else {
+              setBio(data.extract);
+            }
+          } else {
+            setBio(`Listen to ${artist} and more on Beehive Music. Enjoy live queue control and favorites management.`);
+          }
+        } else {
+          setBio(`Listen to ${artist} and more on Beehive Music. Enjoy live queue control and favorites management.`);
+        }
+      } catch {
+        setBio(`Listen to ${artist} and more on Beehive Music. Enjoy live queue control and favorites management.`);
+      }
+    }
+    fetchBio();
+  }, [artist]);
+
+  return <p className="mt-3 line-clamp-4 text-xs leading-5 text-zinc-300">{bio}</p>;
+}
+
 export default function NowPlayingPage() {
 
   const { state } = usePlayer();
@@ -34,7 +67,6 @@ export default function NowPlayingPage() {
   const { user } = useAuth();
   const displayName = user?.display_name || user?.username || 'you';
   const [greeting] = useState(getGreeting);
-  const [artistBio, setArtistBio] = useState('Playback is synced from your Discord server through Beehive. Manage the queue, save favorites, and jump through the track without leaving this room.');
   const [serverPlaylists, setServerPlaylists] = useState<PlaylistSummary[]>([]);
   const [personalPlaylists, setPersonalPlaylists] = useState<PlaylistSummary[]>([]);
 
@@ -74,36 +106,6 @@ export default function NowPlayingPage() {
     loadPersonalPlaylists();
   }, []);
 
-  useEffect(() => {
-    if (!currentAuthor || currentAuthor === 'Unknown Artist' || currentAuthor === 'Start playback from Discord or Search') {
-      setArtistBio('Playback is synced from your Discord server through Beehive. Manage the queue, save favorites, and jump through the track without leaving this room.');
-      return;
-    }
-
-    async function fetchBio() {
-      try {
-        const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(currentAuthor)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.extract) {
-            const words = data.extract.split(/\s+/);
-            if (words.length > 23) {
-              setArtistBio(words.slice(0, 23).join(' ') + '...');
-            } else {
-              setArtistBio(data.extract);
-            }
-          } else {
-            setArtistBio(`Listen to ${currentAuthor} and more on Beehive Music. Enjoy live queue control and favorites management.`);
-          }
-        } else {
-          setArtistBio(`Listen to ${currentAuthor} and more on Beehive Music. Enjoy live queue control and favorites management.`);
-        }
-      } catch (e) {
-        setArtistBio(`Listen to ${currentAuthor} and more on Beehive Music. Enjoy live queue control and favorites management.`);
-      }
-    }
-    fetchBio();
-  }, [currentAuthor]);
   const featuredTracks = track ? [track, ...queue].slice(0, 6) : queue.slice(0, 6);
   const selectedGuildName = guilds.find((g) => g.guild?.discord_guild_id === selectedGuild)?.guild?.name || 'Select Server';
 
@@ -168,7 +170,7 @@ export default function NowPlayingPage() {
                     <Link href="/playlists" className="text-xs font-semibold uppercase tracking-wide text-zinc-400 hover:text-white transition">Show all</Link>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {serverPlaylists.length > 0 ? serverPlaylists.map((p, index) => (
+                    {serverPlaylists.length > 0 ? serverPlaylists.map((p) => (
                       <Link href={`/playlists?id=${p.id}&name=${encodeURIComponent(p.name)}`} key={p.id} className="group flex items-center gap-3 rounded-lg bg-white/10 p-2 transition hover:bg-white/18 cursor-pointer">
                         <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded bg-black/40 flex items-center justify-center">
                           {p.top_artworks && p.top_artworks.length > 0 ? (
@@ -302,7 +304,11 @@ export default function NowPlayingPage() {
                       <p className="text-xs text-zinc-400">Live from {selectedGuildName}</p>
                     </div>
                   </div>
-                  <p className="mt-3 line-clamp-4 text-xs leading-5 text-zinc-300">{artistBio}</p>
+                  {currentAuthor === 'Unknown Artist' || currentAuthor === 'Start playback from Discord or Search' ? (
+                    <p className="mt-3 line-clamp-4 text-xs leading-5 text-zinc-300">{DEFAULT_ARTIST_BIO}</p>
+                  ) : (
+                    <ArtistBio key={currentAuthor} artist={currentAuthor} />
+                  )}
                 </div>
               </div>
             </aside>

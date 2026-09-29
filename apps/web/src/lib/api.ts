@@ -3,23 +3,81 @@
  */
 
 const CONFIGURED_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1';
+const CONFIGURED_WS_BASE = process.env.NEXT_PUBLIC_WS_URL || '/api/v1';
+const LOCAL_API_PORT = process.env.NEXT_PUBLIC_LOCAL_API_PORT || '8001';
+
+function isLocalHostname(hostname: string) {
+  return hostname === 'localhost'
+    || hostname === '127.0.0.1'
+    || hostname.endsWith('.localhost');
+}
+
+function localApiAuthority() {
+  if (window.location.port === '3000') {
+    return `${window.location.hostname}:${LOCAL_API_PORT}`;
+  }
+  return window.location.host;
+}
 
 function normalizeApiBase(base: string) {
-  if (typeof window !== 'undefined') {
-    const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const configuredHost = base.startsWith('http') ? new URL(base).hostname : window.location.hostname;
+  const trimmed = base.replace(/\/$/, '');
 
-    if (isLocalHost || configuredHost !== window.location.hostname) {
-      return window.location.port === '3000' ? `http://${window.location.hostname}:8001/api/v1` : '/api/v1';
+  if (typeof window !== 'undefined') {
+    if (isLocalHostname(window.location.hostname)) {
+      return window.location.port === '3000'
+        ? `http://${localApiAuthority()}/api/v1`
+        : '/api/v1';
+    }
+
+    if (trimmed.startsWith('http')) {
+      try {
+        if (new URL(trimmed).hostname !== window.location.hostname) {
+          return '/api/v1';
+        }
+      } catch {
+        return '/api/v1';
+      }
     }
   }
 
-  const trimmed = base.replace(/\/$/, '');
   return trimmed.endsWith('/api') ? `${trimmed}/v1` : trimmed;
 }
 
 export function getApiBase() {
   return normalizeApiBase(CONFIGURED_API_BASE);
+}
+
+export function getWsBase() {
+  const normalized = CONFIGURED_WS_BASE
+    .replace(/\/$/, '')
+    .replace(/\/ws$/, '/api/v1');
+
+  if (typeof window === 'undefined') return normalized;
+
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const sameOriginBase = `${wsProtocol}://${localApiAuthority()}/api/v1`;
+
+  if (isLocalHostname(window.location.hostname)) {
+    return sameOriginBase;
+  }
+
+  if (normalized.startsWith('ws://') || normalized.startsWith('wss://')) {
+    try {
+      const configured = new URL(normalized);
+      if (configured.hostname !== window.location.hostname) {
+        return sameOriginBase;
+      }
+    } catch {
+      return sameOriginBase;
+    }
+
+    return window.location.protocol === 'https:'
+      ? normalized.replace(/^ws:\/\//, 'wss://')
+      : normalized.replace(/^wss:\/\//, 'ws://');
+  }
+
+  const path = normalized.startsWith('/') ? normalized : `/${normalized}`;
+  return `${wsProtocol}://${window.location.host}${path}`;
 }
 
 interface ApiOptions {
@@ -40,6 +98,8 @@ interface TokenResponse {
 }
 
 class ApiClient {
+  private refreshPromise: Promise<boolean> | null = null;
+
   private getToken(): string | null {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem('beehive_access_token');
@@ -110,6 +170,16 @@ class ApiClient {
   }
 
   private async refreshTokens(): Promise<boolean> {
+    if (!this.refreshPromise) {
+      this.refreshPromise = this.performTokenRefresh().finally(() => {
+        this.refreshPromise = null;
+      });
+    }
+
+    return this.refreshPromise;
+  }
+
+  private async performTokenRefresh(): Promise<boolean> {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) return false;
 

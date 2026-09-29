@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps import get_current_user, require_guild_access_by_id
 from app.schemas.history import PlayHistoryResponse
 from app.services.history_service import HistoryService
 from app.models.user import User
@@ -33,5 +33,6 @@ async def get_guild_history(
     db: AsyncSession = Depends(get_db),
 ):
     """Get play history for a guild."""
+    await require_guild_access_by_id(guild_id, current_user, db)
     service = HistoryService(db)
     return await service.get_guild_history(guild_id, limit, offset)

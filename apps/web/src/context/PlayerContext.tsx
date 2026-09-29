@@ -1,38 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
-import { api } from '@/lib/api';
+import { api, getWsBase } from '@/lib/api';
 import type { PlayerState } from '@/lib/types';
 import { useGuilds } from '@/context/GuildContext';
-
-const CONFIGURED_WS_URL = process.env.NEXT_PUBLIC_WS_URL || '/api/v1';
-
-function normalizeWsBase(base: string) {
-  const trimmed = base.replace(/\/$/, '');
-  return trimmed.endsWith('/ws') ? trimmed.replace(/\/ws$/, '/api/v1') : trimmed;
-}
-
-function getWsBase() {
-  const normalized = normalizeWsBase(CONFIGURED_WS_URL);
-
-  if (typeof window === 'undefined') return normalized;
-
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'ws://localhost:8001/api/v1';
-  }
-
-  if (normalized.startsWith('wss://') && window.location.protocol !== 'https:') {
-    return normalized.replace('wss://', 'ws://');
-  }
-
-  if (normalized.startsWith('ws://') || normalized.startsWith('wss://')) {
-    return normalized;
-  }
-
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const path = normalized.startsWith('/') ? normalized : `/${normalized}`;
-  return `${wsProtocol}://${window.location.host}${path}`;
-}
 
 interface PlayerContextType {
   state: PlayerState | null;

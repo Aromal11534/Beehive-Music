@@ -5,7 +5,6 @@ import { api } from '@/lib/api';
 import { Icon } from '@/components/icons';
 import { useGuilds } from '@/context/GuildContext';
 import { FallbackImage } from '@/components/FallbackImage';
-import { useAuth } from '@/context/AuthContext';
 import { usePlayer } from '@/context/PlayerContext';
 
 interface SearchTrack {
@@ -28,7 +27,6 @@ export function TopSearchBar() {
   const [feedback, setFeedback] = useState<{ idx: number; msg: string } | null>(null);
   
   const { guilds, selectedGuild, setSelectedGuild } = useGuilds();
-  const { user } = useAuth();
   const { sendCommand } = usePlayer();
   const [isReloading, setIsReloading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

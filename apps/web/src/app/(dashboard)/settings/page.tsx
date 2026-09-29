@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { api, getApiBase } from '@/lib/api';
 import type { MfaStatus, SessionInfo } from '@/lib/types';
 import { Icon, type IconName } from '@/components/icons';
 import Cropper from 'react-easy-crop';
+import type { Area } from 'react-easy-crop';
 import { getCroppedImg } from '@/lib/cropUtils';
 
 type SettingsTab = 'profile' | 'security' | 'preferences' | 'admin';
@@ -20,7 +22,7 @@ export default function SettingsPage() {
   const { user, refreshUser } = useAuth();
   const [tab, setTab] = useState<SettingsTab>('profile');
   const [displayName, setDisplayName] = useState(user?.display_name || '');
-  const [email, setEmail] = useState(user?.email || '');
+  const email = user?.email || '';
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [mfaStatus, setMfaStatus] = useState<MfaStatus | null>(null);
@@ -41,7 +43,7 @@ export default function SettingsPage() {
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
 
   useEffect(() => {
     if (tab === 'security') {
@@ -93,7 +95,7 @@ export default function SettingsPage() {
     e.target.value = ''; // Reset input
   };
 
-  const onCropComplete = (croppedArea: any, croppedAreaPixels: any) => {
+  const onCropComplete = (_croppedArea: Area, croppedAreaPixels: Area) => {
     setCroppedAreaPixels(croppedAreaPixels);
   };
 
@@ -133,7 +135,7 @@ export default function SettingsPage() {
     setIsSaving(true);
     setMessage('');
     try {
-      const res = await api.post<any>('/admin/wipe-data');
+      const res = await api.post<{ message?: string }>('/admin/wipe-data');
       setMessage(res.message || 'System data wiped successfully.');
     } catch (err: unknown) {
       setMessage(errorMessage(err));
@@ -207,7 +209,6 @@ export default function SettingsPage() {
     tabs.splice(2, 0, { key: 'admin', label: 'Admin Actions', description: 'System wipes and data management', icon: 'settings' });
   }
 
-  const activeTab = tabs.find((item) => item.key === tab) || tabs[0];
   const initials = user?.display_name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || '?';
   
   const avatarFilename = user?.avatar_path ? user.avatar_path.split(/[/\\]/).pop() : null;
@@ -289,7 +290,7 @@ export default function SettingsPage() {
                     <div className="glass-card p-6 flex flex-col items-center justify-center text-center gap-4">
                       <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-zinc-800 text-5xl font-black text-zinc-400 shadow-2xl shadow-black/20 overflow-hidden">
                         {avatarUrl ? (
-                          <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                          <Image src={avatarUrl} alt="Avatar" width={96} height={96} unoptimized className="w-full h-full object-cover" />
                         ) : (
                           initials
                         )}
@@ -426,7 +427,7 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <p className="text-sm text-zinc-400">Scan this QR code with your authenticator app (like Authy or Google Authenticator).</p>
                   <div className="bg-white p-4 rounded-2xl flex justify-center w-fit mx-auto">
-                    <img src={`data:image/png;base64,${mfaSetupData.qr_code_base64}`} alt="MFA QR Code" className="w-48 h-48" />
+                    <Image src={`data:image/png;base64,${mfaSetupData.qr_code_base64}`} alt="MFA QR Code" width={192} height={192} unoptimized className="w-48 h-48" />
                   </div>
                   <p className="text-xs text-center text-zinc-500 font-mono bg-black/50 p-2 rounded-lg break-all">
                     {mfaSetupData.secret}

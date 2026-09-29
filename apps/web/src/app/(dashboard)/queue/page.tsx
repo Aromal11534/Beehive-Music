@@ -145,7 +145,13 @@ export default function QueuePage() {
   }, []);
 
   useEffect(() => {
-    setOptimisticQueue(Array.isArray(state?.queue) ? state.queue : []);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        setOptimisticQueue(Array.isArray(state?.queue) ? state.queue : []);
+      }
+    });
+    return () => { cancelled = true; };
   }, [state?.queue]);
 
   const sensors = useSensors(
@@ -328,7 +334,7 @@ export default function QueuePage() {
             <div className="relative p-6 border-b border-white/5 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-black text-white">Add to Playlist</h3>
-                <p className="text-sm text-zinc-400 mt-1">Select a destination for "{targetTrack ? getTitle(targetTrack) : 'Track'}"</p>
+                <p className="text-sm text-zinc-400 mt-1">Select a destination for &quot;{targetTrack ? getTitle(targetTrack) : 'Track'}&quot;</p>
               </div>
               <button onClick={() => setShowPlaylistMenu(false)} className="p-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition">
                 <Icon name="x" className="w-5 h-5" />
