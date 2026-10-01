@@ -23,6 +23,7 @@ interface ServerSettings {
   default_volume: number;
   loop_mode: string;
   max_queue_size: number | null;
+  max_song_duration: number | null;
   restricted_mode: boolean;
 }
 
@@ -30,12 +31,14 @@ export default function ServerDashboardPage() {
   const params = useParams();
   const router = useRouter();
   const guildId = Number(params.id);
+  const hasValidGuildId = Number.isSafeInteger(guildId) && guildId > 0;
 
   const [guild, setGuild] = useState<Guild | null>(null);
   const [stats, setStats] = useState<ServerStats | null>(null);
   const [history, setHistory] = useState<TrackHistoryEntry[]>([]);
   const [settings, setSettings] = useState<ServerSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [accentColor, setAccentColor] = useState<string | null>(null);
 
   const { state } = usePlayer();
@@ -43,7 +46,7 @@ export default function ServerDashboardPage() {
   const track = isPlaying ? state?.current_track : null;
 
   useEffect(() => {
-    if (!guildId) return;
+    if (!hasValidGuildId) return;
 
     async function loadData() {
       try {
@@ -57,16 +60,19 @@ export default function ServerDashboardPage() {
             .catch(() => {});
         }
 
-        // Load these independently so they don't break the page if backend isn't reloaded yet
-        Promise.allSettled([
+        // Load secondary data independently while still waiting for the complete view.
+        const [statsRes, historyRes, settingsRes] = await Promise.allSettled([
           api.get<ServerStats>(`/guilds/${guildId}/stats`),
           api.get<TrackHistoryEntry[]>(`/history/guild/${guildId}?limit=20`),
           api.get<ServerSettings>(`/guilds/${guildId}/settings`),
-        ]).then(([statsRes, historyRes, settingsRes]) => {
-          if (statsRes.status === 'fulfilled') setStats(statsRes.value);
-          if (historyRes.status === 'fulfilled') setHistory(Array.isArray(historyRes.value) ? historyRes.value : []);
-          if (settingsRes.status === 'fulfilled') setSettings(settingsRes.value);
-        });
+        ]);
+        if (statsRes.status === 'fulfilled') setStats(statsRes.value);
+        if (historyRes.status === 'fulfilled') setHistory(Array.isArray(historyRes.value) ? historyRes.value : []);
+        if (settingsRes.status === 'fulfilled') setSettings(settingsRes.value);
+        const failures = [statsRes, historyRes, settingsRes].filter((result) => result.status === 'rejected').length;
+        if (failures > 0) {
+          setDetailError(`${failures} server detail ${failures === 1 ? 'request' : 'requests'} failed. Some sections may be unavailable.`);
+        }
 
       } catch (err: unknown) {
         console.error('Failed to load server data:', err);
@@ -79,7 +85,18 @@ export default function ServerDashboardPage() {
     }
 
     loadData();
-  }, [guildId, router]);
+  }, [guildId, hasValidGuildId, router]);
+
+  if (!hasValidGuildId) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center text-center">
+        <Icon name="server" className="mb-4 h-12 w-12 text-zinc-600" />
+        <h2 className="text-xl font-semibold text-zinc-300">Invalid Server</h2>
+        <p className="mt-2 text-zinc-500">The server address is not valid.</p>
+        <Link href="/servers" className="mt-4 rounded-lg bg-zinc-800 px-4 py-2 text-white transition-colors hover:bg-zinc-700">Go Back</Link>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -103,10 +120,10 @@ export default function ServerDashboardPage() {
   }
 
   const statCards = [
-    { label: 'Total Playbacks', value: stats?.total_playbacks ?? 0, icon: 'music' as const, color: 'from-amber-500/20 to-amber-600/10' },
-    { label: 'Total Playlists', value: stats?.total_playlists ?? 0, icon: 'library' as const, color: 'from-blue-500/20 to-blue-600/10' },
-    { label: 'Total Users', value: stats?.total_users ?? 0, icon: 'users' as const, color: 'from-emerald-500/20 to-emerald-600/10' },
-    { label: 'Commands Executed', value: stats?.total_commands ?? 0, icon: 'chart' as const, color: 'from-purple-500/20 to-purple-600/10' },
+    { label: 'Total Playbacks', value: stats?.total_playbacks ?? '—', icon: 'music' as const, color: 'from-amber-500/20 to-amber-600/10' },
+    { label: 'Total Playlists', value: stats?.total_playlists ?? '—', icon: 'library' as const, color: 'from-blue-500/20 to-blue-600/10' },
+    { label: 'Total Users', value: stats?.total_users ?? '—', icon: 'users' as const, color: 'from-emerald-500/20 to-emerald-600/10' },
+    { label: 'Commands Executed', value: stats?.total_commands ?? '—', icon: 'chart' as const, color: 'from-purple-500/20 to-purple-600/10' },
   ];
 
   return (
@@ -116,6 +133,10 @@ export default function ServerDashboardPage() {
         <Icon name="arrow-left" className="w-4 h-4" />
         Back to Servers
       </Link>
+
+      {detailError ? (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{detailError}</div>
+      ) : null}
 
       {/* Top Banner */}
       <div 
@@ -217,31 +238,19 @@ export default function ServerDashboardPage() {
         {/* Server Settings Info */}
         <div className="glass-card p-6 h-fit">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-zinc-100">Bot Settings</h2>
+            <h2 className="text-xl font-semibold text-zinc-100">Web Playback Policy</h2>
             <Icon name="settings" className="w-5 h-5 text-zinc-500" />
           </div>
           
           {settings ? (
             <div className="space-y-5">
               <div>
-                <p className="text-sm font-medium text-zinc-400">Autoplay</p>
-                <p className="text-zinc-200 font-semibold">{settings.autoplay_enabled ? 'Enabled' : 'Disabled'}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-zinc-400">Default Volume</p>
-                <p className="text-zinc-200 font-semibold">{settings.default_volume}%</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-zinc-400">Loop Mode</p>
-                <p className="text-zinc-200 font-semibold capitalize">{settings.loop_mode}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-zinc-400">Restricted Mode</p>
-                <p className="text-zinc-200 font-semibold">{settings.restricted_mode ? 'On (DJ only)' : 'Off'}</p>
-              </div>
-              <div>
                 <p className="text-sm font-medium text-zinc-400">Queue Limit</p>
-                <p className="text-zinc-200 font-semibold">{settings.max_queue_size || 'Unlimited'}</p>
+                <p className="text-zinc-200 font-semibold">{settings.max_queue_size || 500} tracks</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-zinc-400">Maximum Track Duration</p>
+                <p className="text-zinc-200 font-semibold">{settings.max_song_duration ? `${settings.max_song_duration} seconds` : 'No additional limit'}</p>
               </div>
             </div>
           ) : (

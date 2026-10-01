@@ -6,7 +6,6 @@ export interface User {
   avatar_path: string | null;
   is_active: boolean;
   is_admin: boolean;
-  mfa_enabled: boolean;
   created_at?: string;
 }
 
@@ -100,10 +99,6 @@ export interface PlayerState {
   volume: number;
   loop_mode: string;
   queue: PlayerTrack[];
-}
-
-export interface MfaStatus {
-  is_enabled: boolean;
 }
 
 export interface SessionInfo {

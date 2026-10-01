@@ -23,13 +23,12 @@ function isDuplicateError(error: unknown) {
 }
 
 export function GlobalPlayer() {
-  const { state, localPosition, isDraggingRef, sendCommand, commitSeek, handleVolumeChange } = usePlayer();
+  const { state, localPosition, connectionStatus, connectionError, isDraggingRef, sendCommand, commitSeek, handleVolumeChange } = usePlayer();
   const { guilds, selectedGuild } = useGuilds();
 
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
-  const [localVolume, setLocalVolume] = useState<number | null>(null);
-  const [localSeek, setLocalSeek] = useState<number | null>(null);
+  const [localSeek, setLocalSeek] = useState<{ trackKey: string; value: number } | null>(null);
 
   useEffect(() => {
     api.get<PlaylistSummary[]>('/playlists').then((data) => {
@@ -41,7 +40,8 @@ export function GlobalPlayer() {
   const currentTitle = getTrackTitle(track);
   const currentAuthor = getTrackAuthor(track);
   const duration = track?.duration_ms || track?.duration || 0;
-  const displayPosition = localSeek !== null ? localSeek : localPosition;
+  const trackKey = `${selectedGuild || ''}:${track?.queue_id || track?.identifier || track?.track_identifier || track?.track_url || ''}`;
+  const displayPosition = localSeek?.trackKey === trackKey ? localSeek.value : localPosition;
   const progress = duration ? Math.min((displayPosition / duration) * 100, 100) : 0;
   const selectedGuildName = guilds.find((g) => g.guild?.discord_guild_id === selectedGuild)?.guild?.name || 'Select Server';
 
@@ -102,7 +102,27 @@ export function GlobalPlayer() {
     }
   };
 
-  const currentVolume = localVolume !== null ? localVolume : (state?.volume ?? 100);
+  const currentVolume = state?.volume ?? 100;
+  const controlsDisabled = connectionStatus !== 'connected';
+
+  const runCommand = async (action: string, value?: string | number | boolean | Record<string, unknown>) => {
+    if (!(await sendCommand(action, value))) {
+      toast.error(connectionError || 'Live player controls are disconnected.', { id: 'player-connection-error' });
+    }
+  };
+
+  const finishSeek = async (value: number) => {
+    if (!(await commitSeek(value))) {
+      toast.error(connectionError || 'Live player controls are disconnected.', { id: 'player-connection-error' });
+    }
+    setLocalSeek(null);
+  };
+
+  const updateVolume = async (volume: number) => {
+    if (!(await handleVolumeChange(volume))) {
+      toast.error(connectionError || 'Live player controls are disconnected.', { id: 'player-connection-error' });
+    }
+  };
 
   if (!selectedGuild) return null;
 
@@ -117,6 +137,7 @@ export function GlobalPlayer() {
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{track ? currentTitle : 'Nothing playing'}</p>
             <p className="truncate text-xs text-zinc-400">{track ? currentAuthor : selectedGuildName}</p>
+            {connectionError ? <p className="truncate text-[11px] text-red-300" title={connectionError}>{connectionError}</p> : controlsDisabled ? <p className="truncate text-[11px] text-red-300">Live controls disconnected</p> : null}
           </div>
         </div>
 
@@ -126,23 +147,24 @@ export function GlobalPlayer() {
             <button onClick={handleAddFavorite} title="Add to Favorites" className="text-zinc-400 transition hover:text-emerald-400 hover:scale-110">
               <Icon name="star" className="h-4 w-4" />
             </button>
-            <button onClick={() => sendCommand('shuffle')} title="Shuffle" className="text-zinc-400 transition hover:text-white hover:scale-110">
+            <button disabled={controlsDisabled} onClick={() => void runCommand('shuffle')} title="Shuffle" className="text-zinc-400 transition hover:text-white hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40">
               <Icon name="shuffle" className="h-4 w-4" />
             </button>
-            <button onClick={() => sendCommand('previous')} title="Previous" className="text-zinc-300 transition hover:text-white hover:scale-110">
+            <button disabled={controlsDisabled} onClick={() => void runCommand('previous')} title="Previous" className="text-zinc-300 transition hover:text-white hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40">
               <Icon name="skip-back" className="h-5 w-5" />
             </button>
             <button
-              onClick={() => sendCommand(state?.is_playing ? 'pause' : 'resume')}
+              disabled={controlsDisabled}
+              onClick={() => void runCommand(state?.is_playing ? 'pause' : 'resume')}
               title={state?.is_playing ? 'Pause' : 'Resume'}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black transition hover:scale-105"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Icon name={state?.is_playing ? 'pause' : 'play'} className="h-5 w-5" />
             </button>
-            <button onClick={() => sendCommand('skip')} title="Skip" className="text-zinc-300 transition hover:text-white hover:scale-110">
+            <button disabled={controlsDisabled} onClick={() => void runCommand('skip')} title="Skip" className="text-zinc-300 transition hover:text-white hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40">
               <Icon name="skip-forward" className="h-5 w-5" />
             </button>
-            <button onClick={() => sendCommand('loop', state?.loop_mode === 'queue' ? 'off' : 'queue')} title="Loop" className={state?.loop_mode !== 'off' ? 'text-emerald-400' : 'text-zinc-400 transition hover:text-white'}>
+            <button disabled={controlsDisabled} onClick={() => void runCommand('loop', state?.loop_mode === 'queue' ? 'off' : 'queue')} title="Loop" className={`${state?.loop_mode !== 'off' ? 'text-emerald-400' : 'text-zinc-400 transition hover:text-white'} disabled:cursor-not-allowed disabled:opacity-40`}>
               <Icon name="repeat" className="h-4 w-4" />
             </button>
             <button onClick={() => setShowPlaylistMenu(true)} title="Add to Playlist" className="text-zinc-400 transition hover:text-emerald-400 hover:scale-110">
@@ -159,17 +181,21 @@ export function GlobalPlayer() {
                 min="0"
                 max={duration}
                 value={displayPosition}
-                onPointerDown={() => { isDraggingRef.current = true; setLocalSeek(localPosition); }}
+                disabled={controlsDisabled || duration <= 0}
+                onPointerDown={() => { isDraggingRef.current = true; setLocalSeek({ trackKey, value: localPosition }); }}
                 onPointerUp={(e) => {
-                  commitSeek(Number((e.target as HTMLInputElement).value));
-                  setLocalSeek(null);
+                  void finishSeek(Number((e.target as HTMLInputElement).value));
                 }}
                 onPointerCancel={(e) => {
-                  commitSeek(Number((e.target as HTMLInputElement).value));
-                  setLocalSeek(null);
+                  void finishSeek(Number((e.target as HTMLInputElement).value));
                 }}
-                onChange={(e) => setLocalSeek(Number(e.target.value))}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                onChange={(e) => setLocalSeek({ trackKey, value: Number(e.target.value) })}
+                onKeyUp={(e) => {
+                  if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)) {
+                    void finishSeek(Number(e.currentTarget.value));
+                  }
+                }}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
               />
             </div>
             <span className="w-10">{formatTime(duration)}</span>
@@ -182,10 +208,10 @@ export function GlobalPlayer() {
             <button
               onClick={() => {
                 const newVol = currentVolume === 0 ? 100 : 0;
-                setLocalVolume(newVol);
-                handleVolumeChange(newVol);
+                void updateVolume(newVol);
               }}
-              className="text-zinc-400 transition hover:text-white"
+              disabled={controlsDisabled}
+              className="text-zinc-400 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Icon name={currentVolume === 0 ? 'volume-x' : currentVolume < 50 ? 'volume-1' : 'volume-2'} className="h-4 w-4" />
             </button>
@@ -196,12 +222,12 @@ export function GlobalPlayer() {
                 min="0"
                 max="100"
                 value={currentVolume}
+                disabled={controlsDisabled}
                 onChange={(e) => {
                   const vol = Number(e.target.value);
-                  setLocalVolume(vol);
-                  handleVolumeChange(vol);
+                  void updateVolume(vol);
                 }}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
               />
             </div>
           </div>

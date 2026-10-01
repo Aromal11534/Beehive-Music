@@ -1,5 +1,7 @@
 """Playlist endpoints."""
 
+import logging
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +17,7 @@ from app.services.playlist_service import PlaylistService
 from app.models.user import User
 
 router = APIRouter(prefix="/playlists", tags=["Playlists"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=list[PlaylistResponse])
@@ -74,18 +77,28 @@ async def import_playlist(
     )
     playlist = await service.create_playlist(playlist_create, current_user.id)
     
-    # Add all tracks
+    added_count = 0
     for track_data in imported_data["tracks"]:
         try:
-            track_add = PlaylistTrackAdd(**track_data)
-            await service.add_track(playlist.id, track_add, current_user.id, current_user.is_admin)
-        except Exception as e:
-            print(f"Failed to add track {track_data.get('track_title')}: {e}")
-            pass # Skip invalid tracks
+            async with db.begin_nested():
+                track_add = PlaylistTrackAdd(**track_data)
+                await service.add_track(
+                    playlist.id,
+                    track_add,
+                    current_user.id,
+                    current_user.is_admin,
+                )
+            added_count += 1
+        except Exception as exc:
+            logger.warning(
+                "Skipped invalid playlist import track title=%r error=%s",
+                track_data.get("track_title"),
+                type(exc).__name__,
+            )
             
     return PlaylistResponse(
         **{c.name: getattr(playlist, c.name) for c in playlist.__table__.columns},
-        track_count=len(imported_data["tracks"]),
+        track_count=added_count,
     )
 
 
@@ -114,12 +127,16 @@ async def append_playlist(
     # Add all tracks
     for track_data in imported_data["tracks"]:
         try:
-            track_add = PlaylistTrackAdd(**track_data)
-            await service.add_track(playlist_id, track_add, current_user.id, current_user.is_admin)
+            async with db.begin_nested():
+                track_add = PlaylistTrackAdd(**track_data)
+                await service.add_track(playlist_id, track_add, current_user.id, current_user.is_admin)
             added_count += 1
-        except Exception as e:
-            # Duplicate tracks will throw an exception which we silently ignore to deduplicate
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Skipped playlist append track title=%r error=%s",
+                track_data.get("track_title"),
+                type(exc).__name__,
+            )
 
     # Re-fetch playlist to get updated track count
     playlist = await service.get_playlist(playlist_id)

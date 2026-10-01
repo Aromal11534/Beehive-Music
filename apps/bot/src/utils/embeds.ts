@@ -95,7 +95,9 @@ export function formatDuration(ms: number): string {
 
 function createProgressBar(position: number, duration: number): string {
   const total = 20;
-  const filled = duration > 0 ? Math.round((position / duration) * total) : 0;
+  const filled = duration > 0
+    ? Math.max(0, Math.min(total, Math.round((position / duration) * total)))
+    : 0;
   const empty = total - filled;
   return '▓'.repeat(filled) + '░'.repeat(empty);
 }

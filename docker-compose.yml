@@ -1,7 +1,42 @@
 services:
+  internal-token:
+    image: alpine:3.20
+    container_name: beehive-internal-token
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - >-
+        set -eu; umask 077;
+        if [ ! -s /token/internal_api_token ]; then
+          head -c 48 /dev/urandom | base64 > /token/internal_api_token;
+        fi
+    volumes:
+      - internal_token:/token
+
+  # Local PostgreSQL for the documented Docker quick start. Set POSTGRES_HOST
+  # explicitly if you intentionally use an external database.
+  postgres:
+    image: postgres:16-alpine
+    container_name: beehive-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-beehive}
+      POSTGRES_USER: ${POSTGRES_USER:-beehive}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beehive_dev_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - beehive
+
   # ── YouTube Cipher ─────────────────────────────────────
   yt-cipher:
-    image: ghcr.io/kikkia/yt-cipher:master
+    image: ghcr.io/kikkia/yt-cipher@sha256:4c5ec381ff57336cfc24822d2b526a5ad7cd0171f61065a1bbc87bb736842449
     container_name: beehive-yt-cipher
     restart: unless-stopped
     networks:
@@ -16,7 +51,7 @@ services:
     container_name: beehive-redis
     restart: unless-stopped
     ports:
-      - "6380:6379"
+      - "127.0.0.1:6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -29,7 +64,10 @@ services:
 
   # ── Lavalink ───────────────────────────────────────────
   lavalink:
-    image: ghcr.io/lavalink-devs/lavalink:4-alpine
+    build:
+      context: ./infra/lavalink
+      dockerfile: Dockerfile
+    image: beehive-lavalink:4.2.2-youtube-1.18.2
     container_name: beehive-lavalink
     restart: unless-stopped
     environment:
@@ -40,7 +78,7 @@ services:
     volumes:
       - ./infra/lavalink/application.yml:/opt/Lavalink/application.yml:ro
     ports:
-      - "2333:2333"
+      - "127.0.0.1:2333:2333"
     healthcheck:
       test: ["CMD-SHELL", "wget --header=\"Authorization: $${LAVALINK_SERVER_PASSWORD}\" -qO- http://localhost:2333/version || exit 1"]
       interval: 15s
@@ -48,6 +86,32 @@ services:
       retries: 5
     depends_on:
       - yt-cipher
+    networks:
+      - beehive
+
+  migrate:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: beehive-migrate
+    restart: "no"
+    env_file: .env
+    environment:
+      - FASTAPI_ENV=${FASTAPI_ENV:-development}
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER:-beehive}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-beehive_dev_password}
+      - POSTGRES_DB=${POSTGRES_DB:-beehive}
+      - INTERNAL_API_TOKEN_FILE=/run/secrets/internal_api_token
+    volumes:
+      - internal_token:/run/secrets:ro
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      internal-token:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
     networks:
       - beehive
 
@@ -61,19 +125,24 @@ services:
     env_file: .env
     environment:
       - FASTAPI_ENV=${FASTAPI_ENV:-development}
+      - DEBUG=false
       - API_HOST=0.0.0.0
       - API_PORT=8001
-      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_USER=${POSTGRES_USER:-beehive}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-beehive_dev_password}
       - POSTGRES_DB=${POSTGRES_DB:-beehive}
+      - INTERNAL_API_TOKEN_FILE=/run/secrets/internal_api_token
     ports:
       - "127.0.0.1:${API_PUBLISHED_PORT:-8001}:8001"
     volumes:
       - ./apps/api:/app
       - ./storage:/app/storage
+      - internal_token:/run/secrets:ro
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     healthcheck:
@@ -91,7 +160,20 @@ services:
       dockerfile: Dockerfile
     container_name: beehive-bot
     restart: unless-stopped
-    env_file: .env
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_DEV_GUILD_ID=${DISCORD_DEV_GUILD_ID:-}
+      - LAVALINK_HOST=${LAVALINK_HOST:-lavalink}
+      - LAVALINK_PORT=${LAVALINK_PORT:-2333}
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - API_BASE_URL=${API_BASE_URL:-http://api:8001}
+      - INTERNAL_API_TOKEN_FILE=/run/secrets/internal_api_token
+      - NODE_ENV=${NODE_ENV:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - internal_token:/run/secrets:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -124,7 +206,7 @@ services:
       - NEXT_PUBLIC_DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
       - NEXT_PUBLIC_DISCORD_REDIRECT_URI=${NEXT_PUBLIC_DISCORD_REDIRECT_URI:-http://localhost:3000/auth/discord/callback}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       api:
         condition: service_healthy
@@ -137,8 +219,8 @@ services:
     container_name: beehive-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
@@ -162,6 +244,8 @@ services:
       - beehive
 
 volumes:
+  internal_token:
+  postgres_data:
   redis_data:
   letsencrypt_data:
   certbot_webroot:

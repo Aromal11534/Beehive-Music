@@ -66,7 +66,11 @@ export const play: BotCommand = {
           requestedById: interaction.user.id,
         }));
 
-        queue.addMany(tracks);
+        const added = queue.addMany(tracks);
+        if (added !== tracks.length) {
+          await interaction.editReply({ embeds: [errorEmbed(`Queue limit is ${queue.maxSize} tracks.`)] });
+          return;
+        }
         if (!queue.current) {
           const first = queue.next();
           if (first) await musicManager.playTrack(guildId, first);
@@ -101,7 +105,10 @@ export const play: BotCommand = {
         await musicManager.playTrack(guildId, track);
         await interaction.editReply({ embeds: [nowPlayingEmbed(track)] });
       } else {
-        queue.add(track);
+        if (!queue.add(track)) {
+          await interaction.editReply({ embeds: [errorEmbed(`Queue limit is ${queue.maxSize} tracks.`)] });
+          return;
+        }
         await interaction.editReply({ embeds: [trackAddedEmbed(track, queue.length)] });
         await musicManager.publishState(guildId);
       }

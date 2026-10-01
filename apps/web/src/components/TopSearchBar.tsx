@@ -142,8 +142,7 @@ export function TopSearchBar() {
               onClick={() => {
                 if (selectedGuild) {
                   setIsReloading(true);
-                  sendCommand('reload');
-                  setTimeout(() => setIsReloading(false), 1000);
+                  void sendCommand('reload').finally(() => setIsReloading(false));
                 }
               }}
               disabled={isReloading || !selectedGuild}

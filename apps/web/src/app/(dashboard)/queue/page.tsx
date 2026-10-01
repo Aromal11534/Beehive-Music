@@ -131,7 +131,7 @@ function SortableQueueItem({
 }
 
 export default function QueuePage() {
-  const { state, sendCommand } = usePlayer();
+  const { state, sendCommand, connectionError } = usePlayer();
   const [optimisticQueue, setOptimisticQueue] = useState<PlayerTrack[]>([]);
 
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
@@ -159,32 +159,32 @@ export default function QueuePage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
       const { active, over } = event;
     if (active.id !== over?.id && over) {
       const oldIndex = optimisticQueue.findIndex((item, i) => getQueueItemId(item, i) === active.id);
       const newIndex = optimisticQueue.findIndex((item, i) => getQueueItemId(item, i) === over.id);
       if (oldIndex === -1 || newIndex === -1) return;
 
-      if (sendCommand('move', { from: oldIndex, to: newIndex })) {
+      if (await sendCommand('move', { from: oldIndex, to: newIndex })) {
         setOptimisticQueue((q) => arrayMove(q, oldIndex, newIndex));
       } else {
-        toast.error('Player connection is not ready. Try again in a moment.');
+        toast.error(connectionError || 'The queue move was rejected.');
       }
     }
   };
 
-  const handleRemove = (index: number) => {
-    if (sendCommand('remove', { index })) {
+  const handleRemove = async (index: number) => {
+    if (await sendCommand('remove', { index })) {
       setOptimisticQueue((q) => q.filter((_, i) => i !== index));
     } else {
-      toast.error('Player connection is not ready. Try again in a moment.');
+      toast.error(connectionError || 'The queue item could not be removed.');
     }
   };
 
-  const handlePlayNow = (index: number) => {
-    if (!sendCommand('jump', { index })) {
-      toast.error('Player connection is not ready. Try again in a moment.');
+  const handlePlayNow = async (index: number) => {
+    if (!(await sendCommand('jump', { index }))) {
+      toast.error(connectionError || 'The selected queue item could not be played.');
     }
   };
 
@@ -237,11 +237,11 @@ export default function QueuePage() {
     }
   };
 
-  const handleClearQueue = () => {
-    if (sendCommand('clear')) {
+  const handleClearQueue = async () => {
+    if (await sendCommand('clear')) {
       toast.success('Queue cleared');
     } else {
-      toast.error('Player connection is not ready');
+      toast.error(connectionError || 'The queue could not be cleared.');
     }
   };
 
@@ -253,7 +253,7 @@ export default function QueuePage() {
         <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">Queue</h1>
         {optimisticQueue.length > 0 && (
           <button
-            onClick={handleClearQueue}
+            onClick={() => void handleClearQueue()}
             className="text-xs font-semibold text-red-400 hover:text-red-300 bg-red-400/10 hover:bg-red-400/20 px-3 py-1.5 rounded transition flex items-center gap-1.5"
           >
             <Icon name="trash" className="w-3.5 h-3.5" />

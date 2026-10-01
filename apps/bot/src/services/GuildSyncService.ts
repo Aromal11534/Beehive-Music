@@ -13,6 +13,10 @@ export class GuildSyncService {
   }
 
   async syncGuilds(): Promise<void> {
+    if (!config.internalApiToken) {
+      console.error('[GuildSync] INTERNAL_API_TOKEN is required; guild sync skipped');
+      return;
+    }
     const guilds = this.client.guilds.cache.map((guild) => ({
       discord_guild_id: guild.id,
       name: guild.name,

@@ -13,4 +13,4 @@ COPY . .
 
 EXPOSE 8001
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host ${API_HOST:-0.0.0.0} --port ${API_PORT:-8001}"]

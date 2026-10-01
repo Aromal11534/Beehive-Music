@@ -21,17 +21,26 @@ export class RedisService {
     await this.client.publish(channel, message);
   }
 
-  async subscribe(channel: string, handler: (message: string) => void): Promise<void> {
+  async subscribe(channel: string, handler: (message: string) => void | Promise<void>): Promise<void> {
     await this.subscriber.subscribe(channel);
     this.subscriber.on('message', (ch, msg) => {
-      if (ch === channel) handler(msg);
+      if (ch === channel) {
+        void Promise.resolve(handler(msg)).catch((error) => {
+          console.error(`[Redis] Subscriber handler failed for ${channel}:`, error);
+        });
+      }
     });
   }
 
-  async psubscribe(pattern: string, handler: (channel: string, message: string) => void): Promise<void> {
+  async psubscribe(
+    pattern: string,
+    handler: (channel: string, message: string) => void | Promise<void>
+  ): Promise<void> {
     await this.subscriber.psubscribe(pattern);
     this.subscriber.on('pmessage', (_pattern, ch, msg) => {
-      handler(ch, msg);
+      void Promise.resolve(handler(ch, msg)).catch((error) => {
+        console.error(`[Redis] Pattern subscriber handler failed for ${pattern}:`, error);
+      });
     });
   }
 

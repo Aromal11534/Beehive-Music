@@ -6,6 +6,7 @@ import { getDiscordOAuthUrl } from '@/lib/discord-oauth';
 import type { GuildAccess } from '@/lib/types';
 import { Icon } from '@/components/icons';
 import Link from 'next/link';
+import { useGuilds } from '@/context/GuildContext';
 
 const DISCORD_BOT_PERMISSIONS = '36785152';
 
@@ -22,19 +23,47 @@ function getDiscordInviteUrl() {
   return `https://discord.com/oauth2/authorize?${params.toString()}`;
 }
 
-function getDiscordConnectUrl() {
-  return getDiscordOAuthUrl('sync');
-}
-
 export default function ServersPage() {
   const [guilds, setGuilds] = useState<GuildAccess[]>([]);
-  const [connectUrl] = useState<string | null>(() => getDiscordConnectUrl());
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<number | null>(null);
+  const { removeGuild: removeGuildFromContext } = useGuilds();
   const inviteUrl = getDiscordInviteUrl();
 
   useEffect(() => {
-    api.get<GuildAccess[]>('/guilds/my').then((data) => setGuilds(Array.isArray(data) ? data : [])).catch(() => {});
+    let cancelled = false;
+    void api.get<GuildAccess[]>('/guilds/my').then((data) => {
+      if (!cancelled) setGuilds(Array.isArray(data) ? data : []);
+    }).catch((error: unknown) => {
+      if (!cancelled) setLoadError(error instanceof Error ? error.message : 'Failed to load servers.');
+    }).finally(() => {
+      if (!cancelled) setIsLoading(false);
+    });
+    return () => { cancelled = true; };
   }, []);
+
+  const handleConnectDiscord = () => {
+    const connectUrl = getDiscordOAuthUrl('sync');
+    if (!connectUrl) {
+      setLoadError('Discord OAuth is not configured. Check the public client ID and redirect URI.');
+      return;
+    }
+    window.location.assign(connectUrl);
+  };
+
+  const retryLoad = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const data = await api.get<GuildAccess[]>('/guilds/my');
+      setGuilds(Array.isArray(data) ? data : []);
+    } catch (error: unknown) {
+      setLoadError(error instanceof Error ? error.message : 'Failed to load servers.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleRemoveBot = async (guildId: number) => {
     if (!window.confirm('Are you sure you want to remove the bot from this server?')) return;
@@ -42,6 +71,7 @@ export default function ServersPage() {
     try {
       await api.post(`/guilds/${guildId}/leave`);
       setGuilds((prev) => prev.filter((g) => g.guild_id !== guildId));
+      removeGuildFromContext(guildId);
     } catch (e: unknown) {
       alert(`Failed to remove bot: ${e instanceof Error ? e.message : 'Unknown error'}`);
     } finally {
@@ -57,15 +87,14 @@ export default function ServersPage() {
           <p className="text-sm text-zinc-500 mt-1">Connect Beehive to Discord servers where you have permission to add apps.</p>
         </div>
         <div className="flex items-center gap-3">
-          {connectUrl ? (
-            <a
-              href={connectUrl}
+          <button
+              type="button"
+              onClick={handleConnectDiscord}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#5865F2]/10 px-4 py-2.5 text-sm font-semibold text-[#5865F2] hover:bg-[#5865F2]/20 transition border border-[#5865F2]/20"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z" /></svg>
               Connect Discord
-            </a>
-          ) : null}
+          </button>
           {inviteUrl ? (
             <a
               href={inviteUrl}
@@ -90,6 +119,10 @@ export default function ServersPage() {
         </div>
       </div>
 
+      {loadError ? (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{loadError}</div>
+      ) : null}
+
       <div className="glass-card p-5 border-amber-500/10">
         <div className="flex items-start gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400">
@@ -102,7 +135,15 @@ export default function ServersPage() {
         </div>
       </div>
 
-      {guilds.length > 0 ? (
+      {isLoading ? (
+        <div className="flex h-48 items-center justify-center text-zinc-400"><Icon name="loader" className="mr-2 h-5 w-5 animate-spin" /> Loading servers...</div>
+      ) : loadError && guilds.length === 0 ? (
+        <div className="glass-card p-12 text-center">
+          <h2 className="text-xl font-semibold text-zinc-300">Could not load servers</h2>
+          <p className="mt-2 text-zinc-500">Check the API connection and try again.</p>
+          <button onClick={() => void retryLoad()} className="mt-5 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15">Try again</button>
+        </div>
+      ) : guilds.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {guilds.map((access) => (
             <div key={access.id} className="glass-card p-5 hover:border-amber-500/20 transition-colors">

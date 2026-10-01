@@ -17,14 +17,37 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export default function FavoritesPage() {
   const [favorites, setFavorites] = useState<FavoriteTrack[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { selectedGuild } = useGuilds();
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const { state } = usePlayer();
   const track = state?.current_track;
   const isPlaying = !!(state && state.is_playing && !state.is_paused);
 
+  const loadFavorites = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const data = await api.get<FavoriteTrack[]>('/favorites');
+      setFavorites(Array.isArray(data) ? data : []);
+    } catch (error: unknown) {
+      setLoadError(getErrorMessage(error, 'Failed to load favorites.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    api.get<FavoriteTrack[]>('/favorites').then(setFavorites).catch(() => {});
+    let cancelled = false;
+    void api.get<FavoriteTrack[]>('/favorites').then((data) => {
+      if (!cancelled) setFavorites(Array.isArray(data) ? data : []);
+    }).catch((error: unknown) => {
+      if (!cancelled) setLoadError(getErrorMessage(error, 'Failed to load favorites.'));
+    }).finally(() => {
+      if (!cancelled) setIsLoading(false);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const [shuffleEnabled, setShuffleEnabled] = useState(true);
@@ -75,7 +98,7 @@ export default function FavoritesPage() {
           title: track.track_title,
           author: track.track_author || 'Unknown Artist',
           url: track.track_url,
-          identifier: track.track_url,
+          identifier: track.track_identifier || undefined,
           duration: track.duration_ms || 0,
           artwork_url: track.artwork_url,
           source: track.source || 'unknown',
@@ -84,8 +107,8 @@ export default function FavoritesPage() {
       });
       setFeedbackId(`${track.id}-${action}`);
       setTimeout(() => setFeedbackId(null), 2000);
-    } catch {
-      alert("Failed to play track.");
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, 'Failed to play track.'));
     }
   };
 
@@ -108,7 +131,7 @@ export default function FavoritesPage() {
       title: t.track_title,
       author: t.track_author || 'Unknown Artist',
       url: t.track_url,
-      identifier: t.track_url,
+      identifier: t.track_identifier || undefined,
       duration: t.duration_ms || 0,
       artwork_url: t.artwork_url,
       source: t.source || 'unknown',
@@ -120,8 +143,8 @@ export default function FavoritesPage() {
         tracks: mappedTracks,
         action: actionType,
       });
-    } catch {
-      alert("Failed to play favorites.");
+    } catch (error: unknown) {
+      alert(getErrorMessage(error, 'Failed to play favorites.'));
     }
   };
 
@@ -212,7 +235,16 @@ export default function FavoritesPage() {
               {/* Main Content Area */}
               <div className="p-4 md:p-6 lg:p-8 pb-24 md:pb-32 lg:pb-32">
                 <div className="space-y-2">
-                  {favorites.length > 0 ? (
+                  {isLoading ? (
+                    <div className="flex min-h-[300px] items-center justify-center text-zinc-400">
+                      <Icon name="loader" className="mr-2 h-5 w-5 animate-spin" /> Loading favorites...
+                    </div>
+                  ) : loadError ? (
+                    <div className="flex min-h-[300px] flex-col items-center justify-center gap-4 rounded-2xl border border-red-500/20 bg-red-500/5 px-6 text-center">
+                      <p className="text-sm text-red-300">{loadError}</p>
+                      <button onClick={() => void loadFavorites()} className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15">Try again</button>
+                    </div>
+                  ) : favorites.length > 0 ? (
                     favorites.map((t, i) => (
                       <div key={t.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition group">
                         <span className="w-6 text-center text-sm font-medium text-zinc-500 group-hover:text-white">{i + 1}</span>

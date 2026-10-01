@@ -72,7 +72,6 @@ export default function AdminPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase">Email</th>
               <th className="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase">Status</th>
               <th className="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase">Role</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase">MFA</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase">Joined</th>
             </tr>
           </thead>
@@ -106,9 +105,6 @@ export default function AdminPage() {
                 </td>
                 <td className="px-6 py-4 text-center text-sm">
                   {u.is_admin ? <span className="inline-flex items-center justify-center gap-1.5 text-amber-400"><Icon name="shield" className="h-4 w-4" /> Admin</span> : <span className="text-zinc-500">User</span>}
-                </td>
-                <td className="px-6 py-4 text-center text-sm">
-                  {u.mfa_enabled ? <Icon name="lock" className="mx-auto h-4 w-4 text-amber-400" /> : '-'}
                 </td>
                 <td className="px-6 py-4 text-right text-xs text-zinc-500">
                   {u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}

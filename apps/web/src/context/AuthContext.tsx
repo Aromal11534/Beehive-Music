@@ -1,23 +1,18 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import type { User } from '@/lib/types';
 
 interface LoginResponse {
   access_token: string;
   refresh_token: string;
-  mfa_required?: boolean;
-  mfa_token?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<{ mfa_required: boolean; mfa_token?: string }>;
-  register: (username: string, email: string, password: string, displayName: string) => Promise<void>;
-  verifyMfa: (mfaToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   setAuthData: (data: LoginResponse) => Promise<void>;
@@ -64,44 +59,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { isMounted = false; };
   }, []);
 
-  const login = async (username: string, password: string) => {
-    try {
-      const data = await api.post<LoginResponse>('/auth/login', { username, password });
-
-      if (data.mfa_required) {
-        return { mfa_required: true, mfa_token: data.mfa_token };
-      }
-
-      api.setTokens(data.access_token, data.refresh_token);
-      await refreshUser();
-      return { mfa_required: false };
-    } catch (error: unknown) {
-      // Check if MFA required is in error response
-      if (error instanceof ApiError && error.status === 403 && typeof error.detail === 'object' && error.detail !== null && 'mfa_token' in error.detail) {
-        const detail = error.detail as Pick<LoginResponse, 'mfa_token'>;
-        return { mfa_required: true, mfa_token: detail.mfa_token };
-      }
-      throw error;
-    }
-  };
-
-  const register = async (username: string, email: string, password: string, displayName: string) => {
-    const data = await api.post<LoginResponse>('/auth/register', {
-      username,
-      email,
-      password,
-      display_name: displayName,
-    });
-    api.setTokens(data.access_token, data.refresh_token);
-    await refreshUser();
-  };
-
-  const verifyMfa = async (mfaToken: string, code: string) => {
-    const data = await api.post<LoginResponse>('/auth/mfa/verify', { mfa_token: mfaToken, code });
-    api.setTokens(data.access_token, data.refresh_token);
-    await refreshUser();
-  };
-
   const setAuthData = async (data: LoginResponse) => {
     api.setTokens(data.access_token, data.refresh_token);
     await refreshUser();
@@ -123,9 +80,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       isLoading,
       isAuthenticated: !!user,
-      login,
-      register,
-      verifyMfa,
       logout,
       refreshUser,
       setAuthData,

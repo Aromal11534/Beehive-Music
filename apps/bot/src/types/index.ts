@@ -21,6 +21,7 @@ export interface QueueTrack {
   source: string;
   requestedBy: string;
   requestedById?: string;
+  maxDurationMs?: number;
 }
 
 export type LoopMode = 'off' | 'track' | 'queue';

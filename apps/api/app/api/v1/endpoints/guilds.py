@@ -1,6 +1,10 @@
 """Guild management and server settings endpoints."""
 
-from fastapi import APIRouter, Depends, Header, Request
+import hashlib
+import hmac
+import time
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
@@ -42,9 +46,14 @@ async def sync_guilds(
 ):
     """Internal endpoint for bot to sync guilds on startup."""
     settings = get_app_settings()
-    internal_token = settings.internal_api_token or settings.jwt_secret_key
+    internal_token = settings.internal_api_token
+    if not internal_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Internal service authentication is not configured",
+        )
     expected_token = f"Bearer {internal_token}"
-    if not authorization or authorization != expected_token:
+    if not authorization or not hmac.compare_digest(authorization, expected_token):
         raise AuthenticationError("Invalid internal token")
 
     service = GuildService(db)
@@ -135,10 +144,36 @@ async def leave_guild(
     # Publish to Redis so the bot actually leaves the Discord server
     import json
     from app.core.redis import redis_client
-    await redis_client.publish(
+    internal_token = get_app_settings().internal_api_token
+    if not internal_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Internal service authentication is not configured",
+        )
+    issued_at = int(time.time())
+    requester_id = current_user.discord_id or str(current_user.id)
+    signature_payload = f"{guild.discord_guild_id}:leave:{requester_id}:{issued_at}"
+    signature = hmac.new(
+        internal_token.encode("utf-8"),
+        signature_payload.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    subscribers = await redis_client.publish(
         f"web_command:{guild.discord_guild_id}",
-        json.dumps({"action": "leave", "user_id": current_user.id}),
+        json.dumps(
+            {
+                "action": "leave",
+                "user_id": requester_id,
+                "issued_at": issued_at,
+                "signature": signature,
+            }
+        ),
     )
+    if subscribers < 1:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Music bot is unavailable",
+        )
     
     # Delete from database
     await service.delete_guild(guild_id)

@@ -3,6 +3,7 @@
  */
 
 import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { config } from './config';
 import { BotCommand, QueueTrack } from './types';
 import { MusicManager } from './music/MusicManager';
@@ -39,11 +40,55 @@ interface WebPlayableTrack {
 }
 
 interface WebPlayRequest {
+  request_id?: string;
   guild_id?: string;
   track?: WebPlayableTrack;
   tracks?: WebPlayableTrack[];
   action?: string;
   user_discord_id?: string;
+  max_queue_size?: number;
+  max_song_duration_ms?: number;
+}
+
+async function acknowledgePlayRequest(
+  redis: RedisService,
+  requestId: string | undefined,
+  result: { ok: boolean; error?: string }
+): Promise<void> {
+  if (!requestId) return;
+  const resultKey = `play_result:${requestId}`;
+  const readyKey = `play_ready:${requestId}`;
+  await redis.set(resultKey, JSON.stringify(result), 30);
+  await redis.client.lpush(readyKey, '1');
+  await redis.client.expire(readyKey, 30);
+}
+
+async function acknowledgeWebCommand(
+  redis: RedisService,
+  guildId: string,
+  requestId: unknown,
+  result: { ok: boolean; error?: string }
+): Promise<void> {
+  if (typeof requestId !== 'string' || !requestId) return;
+  await redis.publish(`player:${guildId}`, JSON.stringify({
+    type: 'command_result',
+    request_id: requestId,
+    ...result,
+  }));
+}
+
+function isValidSignedLeaveCommand(guildId: string, command: Record<string, unknown>): boolean {
+  if (!config.internalApiToken || config.internalApiToken.length < 32) return false;
+  const userId = typeof command.user_id === 'string' ? command.user_id : '';
+  const issuedAt = typeof command.issued_at === 'number' ? command.issued_at : 0;
+  const signature = typeof command.signature === 'string' ? command.signature : '';
+  if (!userId || !issuedAt || !/^[a-f0-9]{64}$/.test(signature)) return false;
+  if (Math.abs(Math.floor(Date.now() / 1000) - issuedAt) > 30) return false;
+
+  const payload = `${guildId}:leave:${userId}:${issuedAt}`;
+  const expected = createHmac('sha256', config.internalApiToken).update(payload).digest();
+  const provided = Buffer.from(signature, 'hex');
+  return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
 
 async function main() {
@@ -123,67 +168,83 @@ async function main() {
     }
   });
 
+  const getAuthorizedVoiceChannel = async (
+    guildId: string,
+    userId: unknown
+  ): Promise<string | null> => {
+    if (typeof userId !== 'string' || !userId) return null;
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) return null;
+    const member = await guild.members.fetch(userId).catch(() => null);
+    const memberChannelId = member?.voice.channel?.id;
+    if (!memberChannelId) return null;
+
+    const activeChannelId = musicManager.shoukaku.connections.get(guildId)?.channelId;
+    if (activeChannelId && activeChannelId !== memberChannelId) return null;
+    return memberChannelId;
+  };
+
   // Subscribe to web commands from Redis
-  redis.psubscribe('web_command:*', async (channel, message) => {
-    console.log(`[Redis] Received on ${channel}: ${message}`);
+  await redis.psubscribe('web_command:*', async (channel, message) => {
     const guildId = channel.split(':')[1];
     if (!guildId) return;
 
+    let command: Record<string, unknown> = {};
     try {
-      const command = JSON.parse(message);
+      command = JSON.parse(message) as Record<string, unknown>;
+      if (command.action !== 'leave') {
+        const controllerChannel = await getAuthorizedVoiceChannel(guildId, command.user_id);
+        if (!controllerChannel) {
+          throw new Error('Join the bot in its Discord voice channel to use player controls.');
+        }
+      }
       switch (command.action) {
         case 'pause':
-          await musicManager.pause(guildId);
+          if (!(await musicManager.pause(guildId))) throw new Error('Nothing is currently playing.');
           break;
         case 'resume':
-          await musicManager.resume(guildId);
+          if (!(await musicManager.resume(guildId))) throw new Error('Nothing is currently paused.');
           break;
         case 'skip': {
-          const q = musicManager.getQueue(guildId);
-          const next = q.next();
-          if (next) await musicManager.playTrack(guildId, next);
-          else await musicManager.stop(guildId);
+          if (!(await musicManager.skip(guildId))) throw new Error('There is no next track to play.');
           break;
         }
         case 'previous': {
-          const q = musicManager.getQueue(guildId);
-          const prev = q.previous();
-          if (prev) await musicManager.playTrack(guildId, prev);
+          if (!(await musicManager.playPrevious(guildId))) throw new Error('There is no previous track to play.');
           break;
         }
         case 'volume':
-          if (command.value !== undefined) await musicManager.setVolume(guildId, command.value);
+          if (typeof command.value !== 'number' || !(await musicManager.setVolume(guildId, command.value))) {
+            throw new Error('Volume could not be changed because no player is active.');
+          }
           break;
         case 'seek':
-          if (command.value !== undefined) await musicManager.seek(guildId, command.value);
+          if (typeof command.value !== 'number' || !(await musicManager.seek(guildId, command.value))) {
+            throw new Error('Seek could not be applied because no track is active.');
+          }
           break;
         case 'loop': {
-          const q = musicManager.getQueue(guildId);
-          if (command.value && ['off', 'track', 'queue'].includes(command.value)) {
-            q.loopMode = command.value;
+          if (typeof command.value === 'string' && ['off', 'track', 'queue'].includes(command.value)) {
+            await musicManager.setLoopMode(guildId, command.value as 'off' | 'track' | 'queue');
+          } else {
+            throw new Error('Invalid loop mode.');
           }
-          await musicManager.publishState(guildId);
           break;
         }
         case 'shuffle': {
-          const q = musicManager.getQueue(guildId);
-          q.shuffle();
-          await musicManager.publishState(guildId);
+          await musicManager.shuffleQueue(guildId);
           break;
         }
         case 'clear': {
-          const q = musicManager.getQueue(guildId);
-          q.clear();
-          await musicManager.publishState(guildId);
+          await musicManager.clearQueue(guildId);
           break;
         }
         case 'stop':
           await musicManager.stop(guildId);
           break;
         case 'leave': {
-          // Verify the command includes a valid user before leaving
-          if (!command.user_id) {
-            console.warn(`[WebCommand] Leave rejected: no user_id provided for guild ${guildId}`);
+          if (!isValidSignedLeaveCommand(guildId, command)) {
+            console.warn(`[WebCommand] Rejected invalid signed leave command for guild ${guildId}`);
             break;
           }
           const guild = client.guilds.cache.get(guildId);
@@ -195,68 +256,74 @@ async function main() {
           break;
         }
         case 'reload': {
-          if (!command.user_id) {
-            console.warn(`[WebCommand] Reload rejected: no user_id provided for guild ${guildId}`);
-            break;
-          }
           const guild = client.guilds.cache.get(guildId);
-          if (!guild) break;
-          const member = await guild.members.fetch(command.user_id).catch(() => null);
-          const vcId = member?.voice?.channel?.id;
+          if (!guild) throw new Error('Discord server is unavailable.');
+          const vcId = await getAuthorizedVoiceChannel(guildId, command.user_id);
           if (vcId) {
             console.log(`[WebCommand] Reloading bot in guild ${guild.name} (${guildId}) as requested by user ${command.user_id}.`);
             await musicManager.joinChannel(guildId, vcId);
             const queue = musicManager.getQueue(guildId);
             if (queue.current) {
-              await musicManager.playTrack(guildId, queue.current);
+              if (!(await musicManager.playTrack(guildId, queue.current))) {
+                throw new Error('Current track could not be reloaded.');
+              }
             } else {
               const next = queue.next();
-              if (next) await musicManager.playTrack(guildId, next);
+              if (next && !(await musicManager.playTrack(guildId, next))) {
+                throw new Error('Next track could not be started.');
+              }
             }
           } else {
-            console.warn(`[WebCommand] Reload aborted: user ${command.user_id} is not in a voice channel in guild ${guildId}`);
+            throw new Error('Join a Discord voice channel before reloading the bot.');
           }
           break;
         }
         case 'remove': {
-          const q = musicManager.getQueue(guildId);
           if (Number.isInteger(command.index)) {
-            const removed = q.remove(command.index);
-            if (!removed) break;
-            await musicManager.publishState(guildId);
-          }
+            if (!(await musicManager.removeQueuedTrack(guildId, command.index as number))) {
+              throw new Error('Queue item no longer exists.');
+            }
+          } else throw new Error('Invalid queue index.');
           break;
         }
         case 'move': {
-          const q = musicManager.getQueue(guildId);
           if (Number.isInteger(command.from) && Number.isInteger(command.to)) {
-            const moved = q.move(command.from, command.to);
-            if (!moved) break;
-            await musicManager.publishState(guildId);
-          }
+            if (!(await musicManager.moveQueuedTrack(guildId, command.from as number, command.to as number))) {
+              throw new Error('Queue items changed before the move completed.');
+            }
+          } else throw new Error('Invalid queue indexes.');
           break;
         }
         case 'jump': {
-          const q = musicManager.getQueue(guildId);
           if (Number.isInteger(command.index)) {
-            const track = q.jump(command.index);
-            if (track) await musicManager.playTrack(guildId, track);
-          }
+            if (!(await musicManager.jumpTo(guildId, command.index as number))) {
+              throw new Error('Queue item no longer exists.');
+            }
+          } else throw new Error('Invalid queue index.');
           break;
         }
+        default:
+          throw new Error('Unsupported player command.');
       }
+      await acknowledgeWebCommand(redis, guildId, command.request_id, { ok: true });
     } catch (e) {
-      console.error('[WebCommand] Error:', e);
+      const errorMessage = e instanceof Error ? e.message : 'Player command failed.';
+      console.error('[WebCommand] Error:', errorMessage);
+      await acknowledgeWebCommand(redis, guildId, command.request_id, { ok: false, error: errorMessage });
     }
   });
 
   // Subscribe to search requests from the API
-  redis.subscribe('bot_search:request', async (message) => {
+  await redis.subscribe('bot_search:request', async (message) => {
+    let requestId: string | undefined;
+    let resultKey: string | undefined;
+    let readyKey: string | undefined;
     try {
-      console.log('[Search] Received raw message:', message);
-      const { request_id, query } = JSON.parse(message) as { request_id: string; query: string };
-      const resultKey = `search_result:${request_id}`;
-      const readyKey = `search_ready:${request_id}`;
+      const { request_id, query } = JSON.parse(message) as { request_id?: string; query?: string };
+      if (!request_id || !query) throw new Error('Invalid search request');
+      requestId = request_id;
+      resultKey = `search_result:${requestId}`;
+      readyKey = `search_ready:${requestId}`;
       console.log(`[Search] Searching for: ${query}`);
 
       const result = await musicManager.search(query, query.startsWith('http') ? 'ytsearch' : 'ytmsearch');
@@ -307,129 +374,91 @@ async function main() {
       console.log(`[Search] Extracted ${tracks.length} tracks. Saving to ${resultKey}`);
       await redis.set(resultKey, JSON.stringify({ tracks }), 30);
       // Signal the API that results are ready (enables BLPOP instead of polling)
-      await redis.client.lpush(readyKey, '1');
-      await redis.client.expire(readyKey, 30);
     } catch (e) {
       console.error('[Search] Error:', e);
+      if (resultKey) {
+        await redis.set(resultKey, JSON.stringify({ tracks: [], error: 'Search failed' }), 30);
+      }
+    } finally {
+      if (readyKey) {
+        await redis.client.lpush(readyKey, '1');
+        await redis.client.expire(readyKey, 30);
+      }
     }
   });
 
-  redis.subscribe('web_play:request', async (message) => {
+  const webPlayOperations = new Map<string, Promise<void>>();
+
+  const handleWebPlayRequest = async (data: WebPlayRequest): Promise<void> => {
+    const { guild_id, track, tracks, action, user_discord_id } = data;
+    if (!guild_id || !user_discord_id || (!track && !tracks)) {
+      throw new Error('Playback request is missing its guild, requester, or tracks');
+    }
+    if (action !== 'play' && action !== 'queue') {
+      throw new Error('Unsupported playback action');
+    }
+
+    const guild = client.guilds.cache.get(guild_id);
+    if (!guild) throw new Error('The bot is not in this Discord server');
+    const member = await guild.members.fetch(user_discord_id).catch(() => null);
+    const voiceChannelId = member?.voice.channel?.id;
+    if (!voiceChannelId) {
+      throw new Error('Join a voice channel before starting playback');
+    }
+
+    // Validate and join before changing queue state. This makes a rejected voice
+    // request side-effect free and prevents joining an unrelated occupied room.
+    await musicManager.joinChannel(guild_id, voiceChannelId);
+
+    const tracksToAdd = Array.isArray(tracks) ? tracks : track ? [track] : [];
+    if (tracksToAdd.length === 0) throw new Error('No playable tracks were provided');
+    const maxQueueSize = Number.isInteger(data.max_queue_size) && data.max_queue_size! > 0
+      ? Math.min(data.max_queue_size!, 500)
+      : undefined;
+    const maxDurationMs = Number.isSafeInteger(data.max_song_duration_ms)
+      && data.max_song_duration_ms! > 0
+      ? data.max_song_duration_ms
+      : undefined;
+    const queueTracks: QueueTrack[] = tracksToAdd.map((item) => ({
+      encoded: item.encoded,
+      title: item.title || 'Unknown Track',
+      author: item.author || 'Unknown Artist',
+      url: item.url || item.identifier || '',
+      identifier: item.identifier || '',
+      duration: item.duration || 0,
+      artworkUrl: item.artwork_url || item.artworkUrl,
+      source: item.source || 'unknown',
+      requestedBy: 'Web Panel',
+      requestedById: user_discord_id,
+      maxDurationMs,
+    }));
+
+    if (!(await musicManager.playWebTracks(guild_id, queueTracks, action, maxQueueSize))) {
+      throw new Error('The requested tracks could not be started');
+    }
+  };
+
+  await redis.subscribe('web_play:request', async (message) => {
+    let data: WebPlayRequest = {};
     try {
-      console.log(`[WebPlay] Received play request`);
-      const data = JSON.parse(message) as WebPlayRequest;
-      const { guild_id, track, tracks, action, user_discord_id } = data;
-      if (!guild_id || (!track && !tracks)) {
-        console.error('[WebPlay] Missing guild_id or track(s)');
-        return;
-      }
+      data = JSON.parse(message) as WebPlayRequest;
+      const guildId = data.guild_id;
+      if (!guildId) throw new Error('Playback request has no guild');
 
-      const queue = musicManager.getQueue(guild_id);
+      const previous = webPlayOperations.get(guildId) ?? Promise.resolve();
+      const operation = previous.catch(() => undefined).then(() => handleWebPlayRequest(data));
+      const tail = operation.then(() => undefined, () => undefined);
+      webPlayOperations.set(guildId, tail);
+      void tail.then(() => {
+        if (webPlayOperations.get(guildId) === tail) webPlayOperations.delete(guildId);
+      });
 
-      const tracksToAdd = Array.isArray(tracks) ? tracks : track ? [track] : [];
-      if (tracksToAdd.length === 0) return;
-
-      const queueTracks: QueueTrack[] = tracksToAdd.map((t) => ({
-        encoded: t.encoded,
-        title: t.title || 'Unknown Track',
-        author: t.author || 'Unknown Artist',
-        url: t.url || t.identifier || '',
-        identifier: t.identifier || t.url || '',
-        duration: t.duration || 0,
-        artworkUrl: t.artwork_url || t.artworkUrl,
-        source: t.source || 'unknown',
-        requestedBy: 'Web Panel',
-        requestedById: user_discord_id,
-      }));
-
-      if (action === 'queue') {
-        queue.addMany(queueTracks);
-        const state = musicManager.getState(guild_id);
-
-        // If the bot isn't playing anything, auto-start playback
-        if (!state.currentTrack && !state.isPlaying) {
-          const first = queue.next();
-          if (first) {
-            const guild = client.guilds.cache.get(guild_id);
-            let vcId: string | undefined;
-
-            if (guild) {
-              if (user_discord_id) {
-                try {
-                  const member = await guild.members.fetch(user_discord_id).catch(() => null);
-                  if (member?.voice.channel) {
-                    vcId = member.voice.channel.id;
-                  }
-                } catch { }
-              }
-              if (!vcId) {
-                const vc = guild.channels.cache.find((ch) => ch.isVoiceBased() && ch.members.size > 0);
-                if (vc) vcId = vc.id;
-              }
-            }
-
-            if (vcId) {
-              await musicManager.joinChannel(guild_id, vcId);
-              queue.current = first;
-              await musicManager.playTrack(guild_id, first);
-            } else {
-              queue.addNext(first); // put it back
-              console.warn(`[WebPlay] Auto-start aborted: Could not find a suitable voice channel in guild ${guild_id}`);
-              await musicManager.publishState(guild_id);
-            }
-          } else {
-            await musicManager.publishState(guild_id);
-          }
-        } else {
-          await musicManager.publishState(guild_id);
-        }
-      } else {
-        // Play now
-        queue.clear();
-        const first = queueTracks.shift();
-        if (queueTracks.length > 0) {
-          queue.addMany(queueTracks);
-        }
-
-        if (first) {
-          const guild = client.guilds.cache.get(guild_id);
-          let vcId: string | undefined;
-
-          if (guild) {
-            // Priority 1: Try to find the user's voice channel
-            if (user_discord_id) {
-              try {
-                const member = await guild.members.fetch(user_discord_id).catch(() => null);
-                if (member?.voice.channel) {
-                  vcId = member.voice.channel.id;
-                }
-              } catch {
-                // Ignore fetch errors
-              }
-            }
-
-            // Priority 2: Fallback to the first voice channel with users
-            if (!vcId) {
-              const vc = guild.channels.cache.find(
-                (ch) => ch.isVoiceBased() && ch.members.size > 0
-              );
-              if (vc) vcId = vc.id;
-            }
-          }
-
-          if (vcId) {
-            await musicManager.joinChannel(guild_id, vcId);
-            queue.current = first;
-            await musicManager.playTrack(guild_id, first);
-          } else {
-            console.warn(`[WebPlay] Aborted: Could not find a suitable voice channel to join in guild ${guild_id}`);
-            // Explicitly publish state so web UI doesn't get stuck thinking it's loading
-            await musicManager.publishState(guild_id);
-          }
-        }
-      }
-    } catch (e) {
-      console.error('[WebPlay] Error:', e);
+      await operation;
+      await acknowledgePlayRequest(redis, data.request_id, { ok: true });
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : 'Playback request failed';
+      console.error('[WebPlay] Error:', messageText);
+      await acknowledgePlayRequest(redis, data.request_id, { ok: false, error: messageText });
     }
   });
 

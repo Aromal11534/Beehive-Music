@@ -3,13 +3,27 @@
  */
 
 import { Client } from 'discord.js';
-import { Shoukaku, Connectors, Player, LoadType, type LavalinkResponse, type Node, type NodeOption, type Track } from 'shoukaku';
+import { Shoukaku, Connectors, Player, LoadType, type LavalinkResponse, type Node, type NodeOption, type Track, type TrackEndEvent } from 'shoukaku';
 import { config } from '../config';
 import { QueueManager, QueueSnapshot } from './QueueManager';
 import { QueueTrack, GuildPlayerState } from '../types';
 import { RedisService } from '../services/RedisService';
 
 const QUEUE_STATE_TTL_SECONDS = 7 * 24 * 60 * 60;
+const MAX_CONSECUTIVE_PLAYBACK_FAILURES = 3;
+
+class PlaybackPolicyError extends Error {}
+
+interface PlaybackAttempt {
+  track: QueueTrack;
+  generation: number;
+  triedNodes: Set<string>;
+  handledFailures: Set<string>;
+  pendingFailures: Array<{ nodeName: string; encoded?: string }>;
+  encoded?: string;
+  recovering: boolean;
+  announced: boolean;
+}
 
 export class MusicManager {
   public shoukaku: Shoukaku;
@@ -18,32 +32,37 @@ export class MusicManager {
   private redis: RedisService;
   private nodes: NodeOption[];
   private connectPromise: Promise<void> | null = null;
+  private nodeReconnectTimers = new Map<string, NodeJS.Timeout>();
+  private playbackAttempts = new Map<string, PlaybackAttempt>();
+  private consecutivePlaybackFailures = new Map<string, number>();
+  private playbackGenerations = new Map<string, number>();
+  private guildOperations = new Map<string, Promise<void>>();
 
   constructor(client: Client, redis: RedisService) {
     this.client = client;
     this.redis = redis;
 
     this.nodes = [
-      { name: 'local', url: `${config.lavalink.host}:${config.lavalink.port}`, auth: config.lavalink.password, secure: false, group: 'primary' },
-      { name: 'serenetia', url: 'lavalinkv4.serenetia.com:443', auth: 'https://seretia.link/discord', secure: true, group: 'public' },
-      { name: 'jirayu', url: 'lavalink.jirayu.net:443', auth: 'youshallnotpass', secure: true, group: 'public' },
-      { name: 'millohost', url: 'lava-v4.millohost.my.id:443', auth: 'https://discord.gg/mjS5J2K3ep', secure: true, group: 'public' }
+      { name: 'local', url: `${config.lavalink.host}:${config.lavalink.port}`, auth: config.lavalink.password, secure: false, group: 'primary' }
     ];
 
     this.shoukaku = new Shoukaku(new Connectors.DiscordJS(client), [], {
-      moveOnDisconnect: false,
+      moveOnDisconnect: true,
       resume: true,
       resumeTimeout: 30,
-      reconnectTries: 100,
-      reconnectInterval: 5000,
-      restTimeout: 60000,
+      reconnectTries: 10,
+      // Shoukaku expects seconds here (it multiplies this value by 1000).
+      reconnectInterval: 5,
+      restTimeout: 10,
       nodeResolver: (nodes) => this.getConnectedNodes(nodes)[0]
     });
 
-    this.shoukaku.on('ready', (name) => console.log(`[Lavalink] Node ${name} connected`));
+    this.shoukaku.on('ready', (name) => {
+      this.clearNodeReconnectTimer(name);
+      console.log(`[Lavalink] Node ${name} connected`);
+    });
     this.shoukaku.on('error', (name, error) => console.error(`[Lavalink] Node ${name} error:`, error));
     this.shoukaku.on('close', (name, code, reason) => console.warn(`[Lavalink] Node ${name} closed (${code}): ${reason}`));
-    this.shoukaku.on('disconnect', (name) => console.warn(`[Lavalink] Node ${name} disconnected`));
   }
 
   async connectLavalink(): Promise<void> {
@@ -60,12 +79,12 @@ export class MusicManager {
   }
 
   private async connectLavalinkWithRetry(): Promise<void> {
-    for (let attempt = 1; attempt <= 30; attempt++) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
       this.addMissingLavalinkNodes();
 
       if (await this.waitForConnectedNode(3000)) return;
 
-      console.warn(`[Lavalink] Nodes not ready; retrying (${attempt}/30)`);
+      console.warn(`[Lavalink] Nodes not ready; retrying (${attempt}/3)`);
 
       await this.sleep(2000);
     }
@@ -77,9 +96,44 @@ export class MusicManager {
     for (const node of this.nodes) {
       if (!this.shoukaku.nodes.has(node.name)) {
         console.log(`[Lavalink] Adding node ${node.name} (${node.group ?? 'default'})`);
-        this.shoukaku.addNode(node);
+        this.addLavalinkNode(node);
       }
     }
+  }
+
+  private addLavalinkNode(options: NodeOption): void {
+    this.shoukaku.addNode(options);
+    // Shoukaku removes failed nodes from its map but does not forward the
+    // Node-level disconnect event through the manager in v4.3.0.
+    this.shoukaku.nodes.get(options.name)?.once('disconnect', () => {
+      console.warn(`[Lavalink] Node ${options.name} disconnected`);
+      this.scheduleNodeReconnect(options.name);
+    });
+  }
+
+  private clearNodeReconnectTimer(name: string): void {
+    const timer = this.nodeReconnectTimers.get(name);
+    if (!timer) return;
+    clearTimeout(timer);
+    this.nodeReconnectTimers.delete(name);
+  }
+
+  private scheduleNodeReconnect(name: string): void {
+    if (this.nodeReconnectTimers.has(name)) return;
+    const options = this.nodes.find((node) => node.name === name);
+    if (!options) return;
+
+    const timer = setTimeout(() => {
+      this.nodeReconnectTimers.delete(name);
+      const existing = this.shoukaku.nodes.get(name);
+      if (existing?.state === 1 || existing?.state === 0) return;
+
+      if (existing) this.shoukaku.removeNode(name, 'Recreating disconnected node');
+      console.log(`[Lavalink] Re-adding disconnected node ${name}`);
+      this.addLavalinkNode(options);
+    }, 5000);
+
+    this.nodeReconnectTimers.set(name, timer);
   }
 
   private getConnectedNodes(nodes = this.shoukaku.nodes): Node[] {
@@ -122,6 +176,271 @@ export class MusicManager {
     return null;
   }
 
+  private getTrackResolveIdentifier(track: QueueTrack): string | null {
+    const identifier = track.url || track.identifier;
+    if (!identifier) return null;
+
+    if (track.source === 'spotify' || identifier.includes('spotify.com')) {
+      return `ytmsearch:${track.title} ${track.author}`;
+    }
+
+    return identifier;
+  }
+
+  private async resolveTrackOnNode(node: Node, track: QueueTrack): Promise<string | null> {
+    const identifier = this.getTrackResolveIdentifier(track);
+
+    if (identifier) {
+      try {
+        const result = await node.rest.resolve(identifier);
+        const resolvedTrack = this.getFirstResolvedTrack(result);
+        if (resolvedTrack?.encoded) {
+          const actualDuration = resolvedTrack.info.length ?? 0;
+          if (
+            track.maxDurationMs
+            && (resolvedTrack.info.isStream || actualDuration > track.maxDurationMs)
+          ) {
+            throw new PlaybackPolicyError(
+              `Track exceeds this server's ${Math.floor(track.maxDurationMs / 1000)} second duration limit`
+            );
+          }
+
+          // Persist Lavalink's trusted metadata instead of caller-supplied values.
+          track.encoded = resolvedTrack.encoded;
+          track.title = resolvedTrack.info.title || track.title;
+          track.author = resolvedTrack.info.author || track.author;
+          track.url = resolvedTrack.info.uri || track.url;
+          track.identifier = resolvedTrack.info.identifier || track.identifier;
+          track.duration = actualDuration;
+          track.artworkUrl = resolvedTrack.info.artworkUrl || track.artworkUrl;
+          track.source = resolvedTrack.info.sourceName || track.source;
+          return resolvedTrack.encoded;
+        }
+
+        console.warn(`[Player] Node ${node.name} could not resolve ${track.title}`);
+      } catch (error) {
+        if (error instanceof PlaybackPolicyError) throw error;
+        console.warn(`[Player] Node ${node.name} failed to resolve ${track.title}:`, error);
+      }
+    }
+
+    // Encoded tracks are useful for sources that do not expose a resolvable URI.
+    // URL-based tracks are deliberately refreshed above because persisted Lavalink
+    // encodings can become stale or be incompatible with another node.
+    return identifier ? null : track.encoded ?? null;
+  }
+
+  private getPlaybackNodes(player: Player, excludedNodes: Set<string> = new Set()): Node[] {
+    const connectedNodes = this.getConnectedNodes()
+      .filter((node) => !excludedNodes.has(node.name));
+    const currentNode = connectedNodes.find((node) => node.name === player.node.name);
+
+    return currentNode
+      ? [currentNode, ...connectedNodes.filter((node) => node.name !== currentNode.name)]
+      : connectedNodes;
+  }
+
+  private async migrateDisconnectedPlayer(
+    guildId: string,
+    player: Player,
+    targetNode: Node
+  ): Promise<boolean> {
+    const connection = this.shoukaku.connections.get(guildId);
+    if (!connection?.serverUpdate || !connection.sessionId || !connection.channelId) {
+      console.warn(`[Player] Cannot migrate guild ${guildId}: voice connection is not ready`);
+      return false;
+    }
+
+    try {
+      player.track = null;
+      player.position = 0;
+      player.node = targetNode;
+      await player.sendServerUpdate(connection);
+      await player.setGlobalVolume(this.getQueue(guildId).volume);
+      console.log(`[Player] Migrated guild ${guildId} to node ${targetNode.name}`);
+      return true;
+    } catch (error) {
+      console.warn(`[Player] Failed to migrate guild ${guildId} to node ${targetNode.name}:`, error);
+      return false;
+    }
+  }
+
+  private async startTrackOnAvailableNode(
+    guildId: string,
+    player: Player,
+    attempt: PlaybackAttempt,
+    nodes: Node[]
+  ): Promise<boolean> {
+    for (const node of nodes) {
+      if (!this.isCurrentAttempt(guildId, attempt)) return false;
+      attempt.triedNodes.add(node.name);
+      const encoded = await this.resolveTrackOnNode(node, attempt.track);
+      if (!this.isCurrentAttempt(guildId, attempt)) return false;
+      if (!encoded) continue;
+
+      try {
+        if (player.node.name !== node.name) {
+          let moved: boolean;
+          if (player.node.state !== 1 || !this.shoukaku.nodes.has(player.node.name)) {
+            moved = await this.migrateDisconnectedPlayer(guildId, player, node);
+          } else {
+            // Do not let Shoukaku resume the failed encoding while moving. The
+            // freshly resolved encoding is sent immediately after the move.
+            player.track = null;
+            moved = await player.move(node.name);
+          }
+          if (!this.isCurrentAttempt(guildId, attempt)) return false;
+          if (!moved && player.node.name !== node.name) {
+            console.warn(`[Player] Could not move guild ${guildId} to node ${node.name}`);
+            continue;
+          }
+        }
+
+        attempt.encoded = encoded;
+        await player.playTrack({
+          track: { encoded },
+          paused: false,
+          volume: this.getQueue(guildId).volume,
+        });
+        if (!this.isCurrentAttempt(guildId, attempt)) return false;
+        console.log(`[Player] Sent ${attempt.track.title} to node ${node.name} in guild ${guildId}`);
+        await this.publishState(guildId);
+        return true;
+      } catch (error) {
+        console.warn(`[Player] Node ${node.name} rejected ${attempt.track.title}:`, error);
+      }
+    }
+
+    return false;
+  }
+
+  private async publishTrackStart(guildId: string, track: QueueTrack): Promise<void> {
+    try {
+      const payload = {
+        guild_discord_id: guildId,
+        track_title: track.title,
+        track_author: track.author,
+        track_url: track.url || track.identifier,
+        track_identifier: track.identifier,
+        source: track.source,
+        duration_ms: track.duration,
+        requested_by_discord_id: track.requestedById || null
+      };
+      console.log('[MusicManager] Publishing track_start:', payload);
+      await this.redis.publish('bot_event:track_start', JSON.stringify(payload));
+    } catch (error) {
+      console.error('[Redis] Failed to publish track_start event:', error);
+    }
+  }
+
+  private async advanceAfterPlaybackFailure(guildId: string, attempt: PlaybackAttempt): Promise<boolean> {
+    if (!this.isCurrentAttempt(guildId, attempt)) return false;
+
+    this.playbackAttempts.delete(guildId);
+    const failures = (this.consecutivePlaybackFailures.get(guildId) ?? 0) + 1;
+    this.consecutivePlaybackFailures.set(guildId, failures);
+
+    const queue = this.getQueue(guildId);
+    const player = this.shoukaku.players.get(guildId);
+    if (player) {
+      try {
+        await player.stopTrack();
+      } catch (error) {
+        console.warn(`[Player] Could not stop failed playback in guild ${guildId}:`, error);
+      } finally {
+        player.track = null;
+        player.position = 0;
+      }
+    }
+    queue.current = null;
+
+    if (failures >= MAX_CONSECUTIVE_PLAYBACK_FAILURES) {
+      console.error(
+        `[Player] Pausing queue in guild ${guildId} after ${failures} consecutive playback failures`
+      );
+      await this.publishState(guildId);
+      return false;
+    }
+
+    const nextTrack = queue.next(true);
+    if (nextTrack) {
+      const generation = this.nextPlaybackGeneration(guildId);
+      return this.playTrackLocked(guildId, nextTrack, generation);
+    } else {
+      await this.publishState(guildId);
+      return false;
+    }
+  }
+
+  private async recoverPlayback(
+    guildId: string,
+    player: Player,
+    nodeName: string,
+    encoded?: string
+  ): Promise<void> {
+    const attempt = this.playbackAttempts.get(guildId);
+    if (!attempt || !this.isCurrentAttempt(guildId, attempt)) return;
+
+    const failureKey = `${nodeName}:${encoded ?? attempt.encoded ?? 'unknown'}`;
+    if (attempt.handledFailures.has(failureKey)) return;
+    attempt.handledFailures.add(failureKey);
+
+    if (attempt.recovering) {
+      attempt.pendingFailures.push({ nodeName, encoded });
+      return;
+    }
+
+    attempt.recovering = true;
+    try {
+      const fallbackNodes = this.getPlaybackNodes(player, attempt.triedNodes);
+      if (fallbackNodes.length > 0) {
+        console.warn(
+          `[Player] Retrying ${attempt.track.title} in guild ${guildId} after node ${nodeName} failed`
+        );
+      }
+
+      const recovered = await this.startTrackOnAvailableNode(guildId, player, attempt, fallbackNodes);
+      if (!recovered) {
+        await this.advanceAfterPlaybackFailure(guildId, attempt);
+      }
+    } finally {
+      attempt.recovering = false;
+
+      if (this.isCurrentAttempt(guildId, attempt) && attempt.pendingFailures.length > 0) {
+        const pending = attempt.pendingFailures.shift()!;
+        await this.recoverPlayback(guildId, player, pending.nodeName, pending.encoded);
+      }
+    }
+  }
+
+  private async handleTrackEnd(guildId: string, player: Player, data: TrackEndEvent): Promise<void> {
+    if (data.reason === 'replaced' || data.reason === 'stopped' || data.reason === 'cleanup') return;
+
+    const queue = this.getQueue(guildId);
+    const attempt = this.playbackAttempts.get(guildId);
+    if (!attempt || !this.isCurrentAttempt(guildId, attempt)) return;
+    if (attempt?.encoded && data.track.encoded !== attempt.encoded) return;
+
+    if (data.reason === 'loadFailed') {
+      await this.recoverPlayback(guildId, player, player.node.name, data.track.encoded);
+      return;
+    }
+
+    if (data.reason !== 'finished') return;
+
+    if (this.playbackAttempts.get(guildId) === attempt) {
+      this.playbackAttempts.delete(guildId);
+    }
+    this.consecutivePlaybackFailures.set(guildId, 0);
+    const nextTrack = queue.next();
+    if (nextTrack) {
+      const generation = this.nextPlaybackGeneration(guildId);
+      await this.playTrackLocked(guildId, nextTrack, generation);
+    } else {
+      await this.publishState(guildId);
+    }
+  }
+
   private async waitForConnectedNode(timeoutMs: number): Promise<boolean> {
     if (this.shoukaku.getIdealNode()) return true;
 
@@ -140,6 +459,35 @@ export class MusicManager {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private nextPlaybackGeneration(guildId: string): number {
+    const generation = (this.playbackGenerations.get(guildId) ?? 0) + 1;
+    this.playbackGenerations.set(guildId, generation);
+    return generation;
+  }
+
+  private isCurrentAttempt(guildId: string, attempt: PlaybackAttempt): boolean {
+    return this.playbackAttempts.get(guildId) === attempt
+      && this.playbackGenerations.get(guildId) === attempt.generation;
+  }
+
+  private invalidatePlayback(guildId: string): void {
+    this.nextPlaybackGeneration(guildId);
+    this.playbackAttempts.delete(guildId);
+  }
+
+  private runGuildOperation<T>(guildId: string, operation: () => Promise<T>): Promise<T> {
+    const previous = this.guildOperations.get(guildId) ?? Promise.resolve();
+    const result = previous.catch(() => undefined).then(operation);
+    const tail = result.then(() => undefined, () => undefined);
+    this.guildOperations.set(guildId, tail);
+    void tail.then(() => {
+      if (this.guildOperations.get(guildId) === tail) {
+        this.guildOperations.delete(guildId);
+      }
+    });
+    return result;
   }
 
   getQueue(guildId: string): QueueManager {
@@ -202,7 +550,14 @@ export class MusicManager {
 
   async joinChannel(guildId: string, channelId: string): Promise<Player> {
     let player = this.shoukaku.players.get(guildId);
-    if (player) return player;
+    if (player) {
+      const activeChannelId = this.shoukaku.connections.get(guildId)?.channelId;
+      if (activeChannelId && activeChannelId !== channelId) {
+        throw new Error('The bot is already active in another voice channel');
+      }
+      await player.setGlobalVolume(this.getQueue(guildId).volume);
+      return player;
+    }
 
     await this.connectLavalink();
 
@@ -217,30 +572,47 @@ export class MusicManager {
     });
 
     // Set up event handlers
-    player.on('end', async (data) => {
-      if (data.reason === 'replaced') return;
-      const queue = this.getQueue(guildId);
-      const nextTrack = queue.next();
-      if (nextTrack) {
-        await this.playTrack(guildId, nextTrack);
-      } else {
-        await this.publishState(guildId);
+    player.on('start', async (data) => {
+      const attempt = this.playbackAttempts.get(guildId);
+      if (!attempt || (attempt.encoded && data.track.encoded !== attempt.encoded)) return;
+
+      this.consecutivePlaybackFailures.set(guildId, 0);
+      if (!attempt.announced) {
+        attempt.announced = true;
+        await this.publishTrackStart(guildId, attempt.track);
       }
+      await this.publishState(guildId);
     });
 
-    player.on('stuck', async () => {
-      console.warn(`[Player] Track stuck in guild ${guildId}`);
-      const queue = this.getQueue(guildId);
-      const nextTrack = queue.next();
-      if (nextTrack) {
-        await this.playTrack(guildId, nextTrack);
-      }
+    player.on('end', (data) => {
+      void this.runGuildOperation(guildId, () => this.handleTrackEnd(guildId, player, data)).catch((error) => {
+        console.error(`[Player] Failed to handle track end in guild ${guildId}:`, error);
+      });
+    });
+
+    player.on('stuck', (data) => {
+      const nodeName = player.node.name;
+      console.warn(`[Player] Track stuck on node ${nodeName} in guild ${guildId}`);
+      void this.runGuildOperation(
+        guildId,
+        () => this.recoverPlayback(guildId, player, nodeName, data.track.encoded)
+      ).catch((error) => {
+        console.error(`[Player] Failed to recover stuck track in guild ${guildId}:`, error);
+      });
     });
 
     player.on('exception', (error) => {
-      console.error(`[Player] Exception in guild ${guildId}:`, error);
+      const nodeName = player.node.name;
+      console.error(`[Player] Exception on node ${nodeName} in guild ${guildId}:`, error);
+      void this.runGuildOperation(
+        guildId,
+        () => this.recoverPlayback(guildId, player, nodeName)
+      ).catch((recoveryError) => {
+        console.error(`[Player] Failed to recover playback in guild ${guildId}:`, recoveryError);
+      });
     });
 
+    await player.setGlobalVolume(this.getQueue(guildId).volume);
     return player;
   }
 
@@ -255,7 +627,53 @@ export class MusicManager {
     return this.resolveWithFallback(searchQuery);
   }
 
-  async playTrack(guildId: string, track: QueueTrack): Promise<void> {
+  async playTrack(guildId: string, track: QueueTrack): Promise<boolean> {
+    return this.runGuildOperation(guildId, async () => {
+      const generation = this.nextPlaybackGeneration(guildId);
+      return this.playTrackLocked(guildId, track, generation);
+    });
+  }
+
+  async playWebTracks(
+    guildId: string,
+    tracks: QueueTrack[],
+    action: 'play' | 'queue',
+    maxQueueSize?: number
+  ): Promise<boolean> {
+    return this.runGuildOperation(guildId, async () => {
+      if (tracks.length === 0) return false;
+      const queue = this.getQueue(guildId);
+      queue.maxSize = maxQueueSize ? Math.min(maxQueueSize, 500) : 500;
+
+      if (action === 'queue') {
+        const wasIdle = !queue.current && !this.getState(guildId).isPlaying;
+        if (queue.addMany(tracks) !== tracks.length) {
+          throw new Error(`Queue limit is ${queue.maxSize} tracks`);
+        }
+        if (!wasIdle) {
+          await this.publishState(guildId);
+          return true;
+        }
+
+        const first = queue.next(true);
+        if (!first) return false;
+        return this.playTrackLocked(guildId, first, this.nextPlaybackGeneration(guildId));
+      }
+
+      const [first, ...remaining] = tracks;
+      queue.clear();
+      if (queue.addMany(remaining) !== remaining.length) {
+        throw new Error(`Queue limit is ${queue.maxSize} tracks`);
+      }
+      return this.playTrackLocked(guildId, first, this.nextPlaybackGeneration(guildId));
+    });
+  }
+
+  private async playTrackLocked(
+    guildId: string,
+    track: QueueTrack,
+    generation: number
+  ): Promise<boolean> {
     const queue = this.getQueue(guildId);
     queue.current = track;
 
@@ -268,58 +686,118 @@ export class MusicManager {
         queue.addNext(track);
       }
       await this.publishState(guildId);
-      return;
-    }
-
-    try {
-      const payload = {
-        guild_discord_id: guildId,
-        track_title: track.title,
-        track_author: track.author,
-        track_url: track.url || track.identifier,
-        track_identifier: track.identifier,
-        source: track.source,
-        duration_ms: track.duration,
-        requested_by_discord_id: track.requestedById || null
-      };
-      console.log(`[MusicManager] Publishing track_start:`, payload);
-      await this.redis.publish("bot_event:track_start", JSON.stringify(payload));
-    } catch (e) {
-      console.error("[Redis] Failed to publish track_start event:", e);
-    }
-
-    if (track.encoded) {
-      await player.setPaused(false);
-      await player.playTrack({ track: { encoded: track.encoded } });
-      await this.publishState(guildId);
-      return;
+      return false;
     }
 
     await this.connectLavalink();
 
-    let resolveUrl = track.url;
-    if (track.source === 'spotify' || (resolveUrl && resolveUrl.includes('spotify.com'))) {
-      resolveUrl = `ytmsearch:${track.title} ${track.author}`;
+    const attempt: PlaybackAttempt = {
+      track,
+      generation,
+      triedNodes: new Set(),
+      handledFailures: new Set(),
+      pendingFailures: [],
+      recovering: false,
+      announced: false,
+    };
+    this.playbackAttempts.set(guildId, attempt);
+
+    const started = await this.startTrackOnAvailableNode(
+      guildId,
+      player,
+      attempt,
+      this.getPlaybackNodes(player)
+    );
+    if (!started) {
+      return this.advanceAfterPlaybackFailure(guildId, attempt);
     }
+    return true;
+  }
 
-    const result = await this.resolveWithFallback(resolveUrl);
-    const resolvedTrack = this.getFirstResolvedTrack(result);
+  async skip(guildId: string): Promise<boolean> {
+    return this.runGuildOperation(guildId, async () => {
+      this.invalidatePlayback(guildId);
+      const next = this.getQueue(guildId).next(true);
+      if (!next) {
+        await this.stopLocked(guildId);
+        return false;
+      }
+      return this.playTrackLocked(guildId, next, this.nextPlaybackGeneration(guildId));
+    });
+  }
 
-    if (resolvedTrack && 'encoded' in resolvedTrack && typeof resolvedTrack.encoded === 'string') {
-      await player.setPaused(false);
-      await player.playTrack({ track: { encoded: resolvedTrack.encoded } });
+  async playPrevious(guildId: string): Promise<boolean> {
+    return this.runGuildOperation(guildId, async () => {
+      const queue = this.getQueue(guildId);
+      if (queue.history.length === 0) return false;
+      this.invalidatePlayback(guildId);
+      const previous = queue.previous();
+      if (!previous) return false;
+      return this.playTrackLocked(guildId, previous, this.nextPlaybackGeneration(guildId));
+    });
+  }
+
+  async jumpTo(guildId: string, index: number): Promise<boolean> {
+    return this.runGuildOperation(guildId, async () => {
+      const queue = this.getQueue(guildId);
+      if (index < 0 || index >= queue.tracks.length) return false;
+      this.invalidatePlayback(guildId);
+      const track = queue.jump(index);
+      if (!track) return false;
+      return this.playTrackLocked(guildId, track, this.nextPlaybackGeneration(guildId));
+    });
+  }
+
+  async setLoopMode(guildId: string, mode: 'off' | 'track' | 'queue'): Promise<void> {
+    await this.runGuildOperation(guildId, async () => {
+      this.getQueue(guildId).loopMode = mode;
       await this.publishState(guildId);
-    }
+    });
+  }
+
+  async shuffleQueue(guildId: string): Promise<void> {
+    await this.runGuildOperation(guildId, async () => {
+      this.getQueue(guildId).shuffle();
+      await this.publishState(guildId);
+    });
+  }
+
+  async clearQueue(guildId: string): Promise<void> {
+    await this.runGuildOperation(guildId, async () => {
+      this.getQueue(guildId).clear();
+      await this.publishState(guildId);
+    });
+  }
+
+  async removeQueuedTrack(guildId: string, index: number): Promise<boolean> {
+    return this.runGuildOperation(guildId, async () => {
+      const removed = this.getQueue(guildId).remove(index);
+      if (!removed) return false;
+      await this.publishState(guildId);
+      return true;
+    });
+  }
+
+  async moveQueuedTrack(guildId: string, from: number, to: number): Promise<boolean> {
+    return this.runGuildOperation(guildId, async () => {
+      const moved = this.getQueue(guildId).move(from, to);
+      if (!moved) return false;
+      await this.publishState(guildId);
+      return true;
+    });
   }
 
   async stop(guildId: string): Promise<void> {
+    await this.runGuildOperation(guildId, () => this.stopLocked(guildId));
+  }
+
+  private async stopLocked(guildId: string): Promise<void> {
+    this.invalidatePlayback(guildId);
+    this.consecutivePlaybackFailures.delete(guildId);
+    this.getQueue(guildId).reset();
+
     const player = this.shoukaku.players.get(guildId);
-    if (player) {
-      await player.stopTrack();
-    }
-    const queue = this.getQueue(guildId);
-    queue.clear();
-    queue.current = null;
+    if (player) await player.stopTrack();
     await this.publishState(guildId);
   }
 
@@ -329,38 +807,46 @@ export class MusicManager {
     this.queues.delete(guildId);
   }
 
-  async setVolume(guildId: string, volume: number): Promise<void> {
-    const player = this.shoukaku.players.get(guildId);
-    if (player) {
+  async setVolume(guildId: string, volume: number): Promise<boolean> {
+    return this.runGuildOperation(guildId, async () => {
+      const player = this.shoukaku.players.get(guildId);
+      if (!player) return false;
       await player.setGlobalVolume(volume);
       const queue = this.getQueue(guildId);
       queue.volume = volume;
       await this.publishState(guildId);
-    }
+      return true;
+    });
   }
 
-  async seek(guildId: string, positionMs: number): Promise<void> {
-    const player = this.shoukaku.players.get(guildId);
-    if (player) {
+  async seek(guildId: string, positionMs: number): Promise<boolean> {
+    return this.runGuildOperation(guildId, async () => {
+      const player = this.shoukaku.players.get(guildId);
+      if (!player || !this.getQueue(guildId).current) return false;
       await player.seekTo(positionMs);
       await this.publishState(guildId);
-    }
+      return true;
+    });
   }
 
-  async pause(guildId: string): Promise<void> {
-    const player = this.shoukaku.players.get(guildId);
-    if (player) {
+  async pause(guildId: string): Promise<boolean> {
+    return this.runGuildOperation(guildId, async () => {
+      const player = this.shoukaku.players.get(guildId);
+      if (!player || !this.getQueue(guildId).current) return false;
       await player.setPaused(true);
       await this.publishState(guildId);
-    }
+      return true;
+    });
   }
 
-  async resume(guildId: string): Promise<void> {
-    const player = this.shoukaku.players.get(guildId);
-    if (player) {
+  async resume(guildId: string): Promise<boolean> {
+    return this.runGuildOperation(guildId, async () => {
+      const player = this.shoukaku.players.get(guildId);
+      if (!player || !this.getQueue(guildId).current) return false;
       await player.setPaused(false);
       await this.publishState(guildId);
-    }
+      return true;
+    });
   }
 
   getState(guildId: string): GuildPlayerState {

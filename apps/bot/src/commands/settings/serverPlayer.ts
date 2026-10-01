@@ -4,7 +4,7 @@
 
 import { SlashCommandBuilder, ChatInputCommandInteraction, ChannelType } from 'discord.js';
 import { BotCommand } from '../../types';
-import { successEmbed } from '../../utils/embeds';
+import { successEmbed, errorEmbed } from '../../utils/embeds';
 
 export const serverPlayer: BotCommand = {
   data: new SlashCommandBuilder()
@@ -32,9 +32,9 @@ export const serverPlayer: BotCommand = {
         ephemeral: true,
       });
     } else if (subcommand === 'bind') {
-      const channel = interaction.options.getChannel('channel', true);
+      interaction.options.getChannel('channel', true);
       await interaction.reply({
-        embeds: [successEmbed(`Bot responses bound to <#${channel.id}>`)],
+        embeds: [errorEmbed('Text-channel binding is not available yet. No settings were changed.')],
         ephemeral: true,
       });
     }

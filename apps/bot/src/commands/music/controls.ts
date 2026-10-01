@@ -7,13 +7,22 @@ import { LoadType, type Track } from 'shoukaku';
 import { BotCommand } from '../../types';
 import { MusicManager } from '../../music/MusicManager';
 import { nowPlayingEmbed, errorEmbed, successEmbed, formatDuration } from '../../utils/embeds';
+import { voiceControlError } from '../../utils/voiceGuard';
 
 let musicManager: MusicManager;
 export function setMusicManager(mm: MusicManager) { musicManager = mm; }
 
+async function rejectInvalidVoice(interaction: ChatInputCommandInteraction): Promise<boolean> {
+  const error = voiceControlError(interaction, musicManager);
+  if (!error) return false;
+  await interaction.reply({ embeds: [errorEmbed(error)], ephemeral: true });
+  return true;
+}
+
 export const pause: BotCommand = {
   data: new SlashCommandBuilder().setName('pause').setDescription('Pause playback'),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     await musicManager.pause(interaction.guildId!);
     await interaction.reply({ embeds: [successEmbed('Playback paused')] });
   },
@@ -22,6 +31,7 @@ export const pause: BotCommand = {
 export const resume: BotCommand = {
   data: new SlashCommandBuilder().setName('resume').setDescription('Resume playback'),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     await musicManager.resume(interaction.guildId!);
     await interaction.reply({ embeds: [successEmbed('Playback resumed')] });
   },
@@ -30,6 +40,7 @@ export const resume: BotCommand = {
 export const stop: BotCommand = {
   data: new SlashCommandBuilder().setName('stop').setDescription('Stop playback and clear queue'),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     await musicManager.disconnect(interaction.guildId!);
     await interaction.reply({ embeds: [successEmbed('Stopped and disconnected')] });
   },
@@ -38,14 +49,12 @@ export const stop: BotCommand = {
 export const skip: BotCommand = {
   data: new SlashCommandBuilder().setName('skip').setDescription('Skip the current track'),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     const guildId = interaction.guildId!;
-    const queue = musicManager.getQueue(guildId);
-    const next = queue.next();
-    if (next) {
-      await musicManager.playTrack(guildId, next);
-      await interaction.reply({ embeds: [nowPlayingEmbed(next)] });
+    if (await musicManager.skip(guildId)) {
+      const current = musicManager.getQueue(guildId).current;
+      await interaction.reply({ embeds: [current ? nowPlayingEmbed(current) : successEmbed('Skipped')] });
     } else {
-      await musicManager.stop(guildId);
       await interaction.reply({ embeds: [successEmbed('Queue finished')] });
     }
   },
@@ -54,12 +63,11 @@ export const skip: BotCommand = {
 export const previous: BotCommand = {
   data: new SlashCommandBuilder().setName('previous').setDescription('Play the previous track'),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     const guildId = interaction.guildId!;
-    const queue = musicManager.getQueue(guildId);
-    const prev = queue.previous();
-    if (prev) {
-      await musicManager.playTrack(guildId, prev);
-      await interaction.reply({ embeds: [nowPlayingEmbed(prev)] });
+    if (await musicManager.playPrevious(guildId)) {
+      const current = musicManager.getQueue(guildId).current;
+      await interaction.reply({ embeds: [current ? nowPlayingEmbed(current) : successEmbed('Playing previous track')] });
     } else {
       await interaction.reply({ embeds: [errorEmbed('No previous track in history')], ephemeral: true });
     }
@@ -84,6 +92,7 @@ export const volume: BotCommand = {
     .setDescription('Set the playback volume')
     .addIntegerOption(opt => opt.setName('level').setDescription('Volume level (0-200)').setRequired(true).setMinValue(0).setMaxValue(200)),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     const level = interaction.options.getInteger('level', true);
     await musicManager.setVolume(interaction.guildId!, level);
     await interaction.reply({ embeds: [successEmbed(`Volume set to **${level}%**`)] });
@@ -96,6 +105,7 @@ export const seek: BotCommand = {
     .setDescription('Seek to a position in the current track')
     .addIntegerOption(opt => opt.setName('seconds').setDescription('Position in seconds').setRequired(true).setMinValue(0)),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     const seconds = interaction.options.getInteger('seconds', true);
     await musicManager.seek(interaction.guildId!, seconds * 1000);
     await interaction.reply({ embeds: [successEmbed(`Seeked to **${formatDuration(seconds * 1000)}**`)] });
@@ -141,7 +151,6 @@ export const search: BotCommand = {
 export const autoplay: BotCommand = {
   data: new SlashCommandBuilder().setName('autoplay').setDescription('Toggle autoplay mode'),
   async execute(interaction: ChatInputCommandInteraction) {
-    // Autoplay can be implemented by fetching related tracks when queue empties
-    await interaction.reply({ embeds: [successEmbed('Autoplay toggled (feature in development)')] });
+    await interaction.reply({ embeds: [errorEmbed('Autoplay is not available yet. Use the web queue to add more tracks.')], ephemeral: true });
   },
 };

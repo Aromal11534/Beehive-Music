@@ -4,7 +4,7 @@
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { BotCommand } from '../../types';
-import { successEmbed, errorEmbed } from '../../utils/embeds';
+import { errorEmbed } from '../../utils/embeds';
 import { MusicManager } from '../../music/MusicManager';
 
 let musicManager: MusicManager;
@@ -29,14 +29,14 @@ export const favorites: BotCommand = {
           await interaction.reply({ embeds: [errorEmbed('Nothing is playing')], ephemeral: true });
           return;
         }
-        await interaction.reply({ embeds: [successEmbed(`**${queue.current.title}** saved to favorites via API`)], ephemeral: true });
+        await interaction.reply({ embeds: [errorEmbed('Saving favorites from Discord is not available yet. Use the web player for this track.')], ephemeral: true });
         break;
       }
       case 'remove':
-        await interaction.reply({ embeds: [successEmbed('Visit the web portal to manage favorites')], ephemeral: true });
+        await interaction.reply({ embeds: [errorEmbed('Favorite removal is available in the web portal.')], ephemeral: true });
         break;
       case 'list':
-        await interaction.reply({ embeds: [successEmbed('Visit beehive.teamsyndicate.org to view your favorites')], ephemeral: true });
+        await interaction.reply({ embeds: [errorEmbed('Favorite listing is available in the web portal.')], ephemeral: true });
         break;
     }
   },

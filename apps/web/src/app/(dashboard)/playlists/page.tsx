@@ -24,6 +24,12 @@ interface ImportPlaylistPayload {
   owner_guild_id?: number;
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
+
 function PlaylistsContent() {
   const [personalPlaylists, setPersonalPlaylists] = useState<PlaylistSummary[]>([]);
   const [serverPlaylists, setServerPlaylists] = useState<PlaylistSummary[]>([]);
@@ -39,12 +45,7 @@ function PlaylistsContent() {
   const { guilds, selectedGuild } = useGuilds();
   const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const [shuffleEnabled, setShuffleEnabled] = useState(true);
-
-  const getErrorMessage = (error: unknown, fallback: string) => {
-    if (error instanceof ApiError) return error.message;
-    if (error instanceof Error) return error.message;
-    return fallback;
-  };
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const blurAfterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.currentTarget.blur();
@@ -68,35 +69,43 @@ function PlaylistsContent() {
   const fetchPlaylists = useCallback(async () => {
     let personal: PlaylistSummary[] = [];
     let server: PlaylistSummary[] = [];
+    let firstError: string | null = null;
 
     try {
       personal = await api.get<PlaylistSummary[]>('/playlists');
-    } catch { }
+    } catch (error: unknown) {
+      firstError = getErrorMessage(error, 'Failed to load personal playlists.');
+    }
 
     if (selectedGuild) {
       const g = guilds.find(g => g.guild?.discord_guild_id === selectedGuild);
       if (g && g.guild_id) {
         try {
           server = await api.get<PlaylistSummary[]>(`/guilds/${g.guild_id}/playlists`);
-        } catch { }
+        } catch (error: unknown) {
+          firstError ??= getErrorMessage(error, 'Failed to load server playlists.');
+        }
       }
     }
 
-    return { personal, server };
+    return { personal, server, error: firstError };
   }, [selectedGuild, guilds]);
 
   const loadPlaylists = useCallback(async () => {
-    const { personal, server } = await fetchPlaylists();
+    setLoadError(null);
+    const { personal, server, error } = await fetchPlaylists();
     setPersonalPlaylists(personal);
     setServerPlaylists(server);
+    setLoadError(error);
   }, [fetchPlaylists]);
 
   useEffect(() => {
     let cancelled = false;
-    void fetchPlaylists().then(({ personal, server }) => {
+    void fetchPlaylists().then(({ personal, server, error }) => {
       if (!cancelled) {
         setPersonalPlaylists(personal);
         setServerPlaylists(server);
+        setLoadError(error);
       }
     });
     return () => { cancelled = true; };
@@ -169,7 +178,8 @@ function PlaylistsContent() {
     try {
       const data = await api.get<PlaylistDetail>(`/playlists/${id}`);
       setSelectedPlaylist(data);
-    } catch {
+    } catch (error: unknown) {
+      setLoadError(getErrorMessage(error, 'Failed to load playlist.'));
       setSelectedPlaylist(null);
     }
   };
@@ -212,7 +222,7 @@ function PlaylistsContent() {
               track_title: item.track_title || item.title || 'Unknown Track',
               track_author: item.track_author || item.author || 'Unknown Artist',
               track_url: trackUrl,
-              track_identifier: item.track_identifier || item.identifier || trackUrl,
+              track_identifier: item.track_identifier || item.identifier || null,
               source: item.source || (trackUrl.includes('spotify') ? 'spotify' : 'youtube'),
               duration_ms: item.duration_ms || item.duration || 0,
               artwork_url: item.artwork_url || item.artworkUrl || '',
@@ -225,8 +235,11 @@ function PlaylistsContent() {
         try {
           const data = await api.get<PlaylistDetail>(`/playlists/${Number(initialId)}`);
           if (!cancelled) setSelectedPlaylist(data);
-        } catch {
-          if (!cancelled) setSelectedPlaylist(null);
+        } catch (error: unknown) {
+          if (!cancelled) {
+            setLoadError(getErrorMessage(error, 'Failed to load playlist.'));
+            setSelectedPlaylist(null);
+          }
         }
       } else {
         setSelectedPlaylist(null);
@@ -252,7 +265,7 @@ function PlaylistsContent() {
           title: track.track_title,
           author: track.track_author || 'Unknown Artist',
           url: track.track_url,
-          identifier: track.track_url,
+          identifier: track.track_identifier || undefined,
           duration: track.duration_ms || 0,
           artwork_url: track.artwork_url,
           source: track.source || (track.track_url.includes('spotify') ? 'spotify' : 'youtube'),
@@ -296,7 +309,7 @@ function PlaylistsContent() {
       title: t.track_title,
       author: t.track_author || 'Unknown Artist',
       url: t.track_url,
-      identifier: t.track_url,
+      identifier: t.track_identifier || undefined,
       duration: t.duration_ms || 0,
       artwork_url: t.artwork_url,
       source: t.source || (t.track_url.includes('spotify') ? 'spotify' : 'youtube'),
@@ -336,6 +349,13 @@ function PlaylistsContent() {
         <div className="relative z-10 flex flex-1 min-h-0 flex-col">
           <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
             <section className="min-h-0 flex-1 overflow-y-auto rounded-[22px] bg-[#121212]/90 relative">
+
+              {loadError ? (
+                <div className="relative z-20 m-4 flex items-center justify-between gap-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                  <span>{loadError}</span>
+                  <button onClick={() => void loadPlaylists()} className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 font-semibold text-white transition hover:bg-white/15">Retry</button>
+                </div>
+              ) : null}
 
               {/* Top Gradient Banner */}
               <div className="relative rounded-t-[22px] shrink-0 bg-gradient-to-br from-[#064e3b] via-[#022c22] to-[#111111] p-4 md:p-6 lg:p-8 z-10">

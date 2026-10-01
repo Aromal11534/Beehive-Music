@@ -18,6 +18,7 @@ from app.core.exceptions import (
     AuthenticationError, AccountLockedError, MFARequiredError
 )
 from app.core.redis import redis_client
+from app.core.config import get_settings
 from app.models.user import User, UserMfa, UserSession
 
 logger = logging.getLogger(__name__)
@@ -179,7 +180,9 @@ class AuthService:
             refresh_token_hash=hash_token(refresh_token),
             ip_address=ip,
             user_agent=parsed_user_agent,
-            expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+            expires_at=datetime.now(timezone.utc) + timedelta(
+                days=get_settings().jwt_refresh_expire_days
+            ),
         )
         self.db.add(session)
 
@@ -230,11 +233,7 @@ class AuthService:
             session.revoked_at = datetime.now(timezone.utc)
 
     async def initiate_password_reset(self, email: str):
-        """Generate a password reset token for the given email.
-        
-        Always succeeds silently to prevent email enumeration.
-        In production, send the token via email. For now, log it.
-        """
+        """Generate and email a password reset token without exposing it to logs."""
         result = await self.db.execute(
             select(User).where(User.email == email)
         )
@@ -247,8 +246,6 @@ class AuthService:
         await redis_client.setex(
             f"password_reset:{reset_token}", 1800, str(user.id)  # 30 minutes
         )
-        logger.info("Password reset token for user_id=%s: %s", user.id, reset_token)
-
         try:
             from app.services.email_service import EmailService
             EmailService().send_password_reset_email(email, reset_token)
@@ -271,53 +268,54 @@ class AuthService:
         from app.core.security import hash_password
         user.password_hash = hash_password(new_password)
         user.updated_at = datetime.now(timezone.utc)
+        await self.logout_all(user.id)
         await redis_client.delete(f"password_reset:{token}")
 
-    async def login_with_discord(self, discord_id: str, email: str | None, username: str, ip: str | None = None, user_agent: str | None = None) -> dict:
+    async def login_with_discord(
+        self,
+        discord_id: str,
+        email: str | None,
+        username: str,
+        ip: str | None = None,
+        user_agent: str | None = None,
+    ) -> tuple[dict, User]:
         """Authenticate or register user via Discord OAuth."""
-        # 1. Try finding by discord_id
         result = await self.db.execute(select(User).where(User.discord_id == discord_id))
         user = result.scalar_one_or_none()
-        
-        if not user and email:
-            # 2. Try finding by email
-            result = await self.db.execute(select(User).where(User.email == email))
-            user = result.scalar_one_or_none()
-            if user:
-                # Link account
-                user.discord_id = discord_id
-                self.db.add(user)
-        
+
         if not user:
-            # 3. Create new user
             from app.core.security import hash_password
-            
+
             # Ensure unique username
-            base_username = username
+            base_username = username[:56]
+            candidate = base_username
             counter = 1
             while True:
-                existing = await self.db.execute(select(User).where(User.username == username))
+                existing = await self.db.execute(select(User).where(User.username == candidate))
                 if not existing.scalar_one_or_none():
                     break
-                username = f"{base_username}{counter}"
+                candidate = f"{base_username}{counter}"
                 counter += 1
-                
+
             random_password = secrets.token_urlsafe(32)
             user = User(
-                username=username,
+                username=candidate,
                 email=email,
                 display_name=username,
                 password_hash=hash_password(random_password),
                 discord_id=discord_id,
-                is_admin=False
+                is_admin=False,
             )
             self.db.add(user)
             await self.db.flush()
+        elif email and user.email != email:
+            # This email was verified by Discord, but it is never used to select
+            # or link an account.
+            user.email = email
 
         if not user.is_active:
             raise AuthenticationError("Account is deactivated")
-            
-        await self.db.commit()
 
-        return await self._create_session(user, ip, user_agent)
-
+        session = await self._create_session(user, ip, user_agent)
+        await self.db.flush()
+        return session, user

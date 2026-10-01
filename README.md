@@ -23,20 +23,20 @@ A premium, production-grade Discord music bot system with a private web control 
 
 ## Services
 
-| Service      | Stack                    | Port  |
-|:-------------|:-------------------------|:------|
+| Service      | Stack                    | Default port |
+|:-------------|:-------------------------|:-------------|
 | **Bot**      | Node.js + TypeScript     | —     |
-| **API**      | Python FastAPI           | 8001  |
-| **Web**      | Next.js + Tailwind CSS   | 3000  |
-| **Lavalink** | Java + Lavalink v4       | 2333  |
-| **Postgres** | PostgreSQL 16            | 5432  |
-| **Redis**    | Redis 7                  | 6379  |
-| **Nginx**    | Reverse Proxy + SSL      | 80/443|
+| **API**      | Python FastAPI           | 8001 (loopback) |
+| **Web**      | Next.js + Tailwind CSS   | 3000 (loopback) |
+| **Lavalink** | Java + Lavalink v4       | 2333 (loopback) |
+| **Postgres** | PostgreSQL 16            | 5432 (internal) |
+| **Redis**    | Redis 7                  | 6380 → 6379 (loopback) |
+| **Nginx**    | Reverse Proxy            | 80/443 (loopback locally) |
 
 ## Features
 
 ### Discord Bot
-- **21 slash commands**: Play, Skip, Pause, Resume, Stop, Previous, NowPlaying, Volume, Seek, Search, Autoplay, Queue, Shuffle, Loop, Clear, Remove, Move, Jump, Playlist, Favorites, Help
+- **22 slash commands**: Play, Skip, Pause, Resume, Stop, Previous, NowPlaying, Volume, Seek, Search, Autoplay, Queue, Shuffle, Loop, Clear, Remove, Move, Jump, Playlist, Favorites, Help, Server Player
 - **Lavalink v4** audio with Shoukaku client
 - **Per-guild queues** with loop (off/track/queue), shuffle, history
 - **Prefix command hints** (`!play` → suggests `/play`)
@@ -44,18 +44,17 @@ A premium, production-grade Discord music bot system with a private web control 
 
 ### Web Control Panel
 - **Premium dark UI** with glassmorphism and amber theme
-- **Login-only system** (no public signup)
-- **MFA support** (TOTP with QR code + recovery codes)
+- **Discord-only sign-in** (no password or public signup form)
 - **Dashboard** with stats, recent activity, quick actions
 - **Now Playing** with album art, controls, volume, progress bar
 - **Playlists, Favorites, History** management
 - **Server management** with role-based access
-- **Settings** (profile, security, preferences)
+- **Settings** for Discord profile and active sessions
 - **Admin panel** with user table and search
 
 ### API
 - **JWT authentication** with refresh token rotation
-- **Account lockout** (5 failed attempts → 15min lockout)
+- **Discord OAuth2 authentication** with exact callback validation
 - **Session management** (list, revoke, revoke-all)
 - **Full CRUD** for users, guilds, playlists, favorites
 - **WebSocket** for realtime player state updates
@@ -81,29 +80,27 @@ A premium, production-grade Discord music bot system with a private web control 
    # Edit .env with your credentials
    ```
 
-2. **Start services:**
+2. In the Discord Developer Portal, register this exact OAuth2 redirect:
+   `http://localhost:3000/auth/discord/callback`
+
+3. **Build and start services (migrations run automatically):**
    ```bash
-   docker compose up -d
+   docker compose up -d --build
    ```
 
-3. **Run database migrations:**
+4. **Confirm the API and music node are healthy:**
    ```bash
-   docker compose exec api alembic upgrade head
-   ```
-
-4. **Create your first admin user:**
-   ```bash
-   docker compose exec api python scripts/interactive_admin.py
+   docker compose ps
    ```
 
 5. **Deploy slash commands:**
    ```bash
-   docker compose exec bot npm run deploy-commands
+   docker compose exec bot node dist/deploy-commands.js
    ```
 
 6. **Access the web panel:**
    - Development: `http://localhost:3000`
-   - Production: `https://beehive.teamsyndicate.org`
+   - Production: follow [`DEPLOY_APP_ONLY.md`](./DEPLOY_APP_ONLY.md) and configure your public reverse proxy
 
 ## Development
 
@@ -125,9 +122,7 @@ cd scripts && pip install -r requirements.txt && python interactive_admin.py
 
 See `.env.example` for all required environment variables.
 
-## Domain
-
-This project is deployed at **beehive.teamsyndicate.org**.
+For environment details and the required matching Discord callback values, see [`env.md`](./env.md).
 
 ---
 

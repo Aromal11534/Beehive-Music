@@ -6,9 +6,17 @@ import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { BotCommand } from '../../types';
 import { MusicManager } from '../../music/MusicManager';
 import { queueEmbed, errorEmbed, successEmbed } from '../../utils/embeds';
+import { voiceControlError } from '../../utils/voiceGuard';
 
 let musicManager: MusicManager;
 export function setMusicManager(mm: MusicManager) { musicManager = mm; }
+
+async function rejectInvalidVoice(interaction: ChatInputCommandInteraction): Promise<boolean> {
+  const error = voiceControlError(interaction, musicManager);
+  if (!error) return false;
+  await interaction.reply({ embeds: [errorEmbed(error)], ephemeral: true });
+  return true;
+}
 
 export const queue: BotCommand = {
   data: new SlashCommandBuilder()
@@ -26,6 +34,7 @@ export const queue: BotCommand = {
 export const shuffle: BotCommand = {
   data: new SlashCommandBuilder().setName('shuffle').setDescription('Shuffle the queue'),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     const q = musicManager.getQueue(interaction.guildId!);
     q.shuffle();
     await musicManager.publishState(interaction.guildId!);
@@ -48,6 +57,7 @@ export const loop: BotCommand = {
         )
     ),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     const mode = interaction.options.getString('mode', true) as 'off' | 'track' | 'queue';
     const q = musicManager.getQueue(interaction.guildId!);
     q.loopMode = mode;
@@ -61,6 +71,7 @@ export const loop: BotCommand = {
 export const clear: BotCommand = {
   data: new SlashCommandBuilder().setName('clear').setDescription('Clear the queue'),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     const q = musicManager.getQueue(interaction.guildId!);
     q.clear();
     await musicManager.publishState(interaction.guildId!);
@@ -74,6 +85,7 @@ export const remove: BotCommand = {
     .setDescription('Remove a track from the queue')
     .addIntegerOption(opt => opt.setName('position').setDescription('Track position (1-based)').setRequired(true).setMinValue(1)),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     const pos = interaction.options.getInteger('position', true) - 1;
     const q = musicManager.getQueue(interaction.guildId!);
     const removed = q.remove(pos);
@@ -93,6 +105,7 @@ export const move: BotCommand = {
     .addIntegerOption(opt => opt.setName('from').setDescription('Current position').setRequired(true).setMinValue(1))
     .addIntegerOption(opt => opt.setName('to').setDescription('New position').setRequired(true).setMinValue(1)),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     const from = interaction.options.getInteger('from', true) - 1;
     const to = interaction.options.getInteger('to', true) - 1;
     const q = musicManager.getQueue(interaction.guildId!);
@@ -111,13 +124,12 @@ export const jump: BotCommand = {
     .setDescription('Jump to a specific track in the queue')
     .addIntegerOption(opt => opt.setName('position').setDescription('Track position').setRequired(true).setMinValue(1)),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (await rejectInvalidVoice(interaction)) return;
     const pos = interaction.options.getInteger('position', true) - 1;
     const guildId = interaction.guildId!;
-    const q = musicManager.getQueue(guildId);
-    const track = q.jump(pos);
-    if (track) {
-      await musicManager.playTrack(guildId, track);
-      await interaction.reply({ embeds: [successEmbed(`Jumped to **${track.title}**`)] });
+    if (await musicManager.jumpTo(guildId, pos)) {
+      const track = musicManager.getQueue(guildId).current;
+      await interaction.reply({ embeds: [successEmbed(`Jumped to **${track?.title || 'selected track'}**`)] });
     } else {
       await interaction.reply({ embeds: [errorEmbed('Invalid position')], ephemeral: true });
     }

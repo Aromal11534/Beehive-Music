@@ -29,7 +29,7 @@ class PlaylistService:
             description=data.description,
             playlist_type=data.playlist_type,
             is_public=data.is_public,
-            owner_user_id=user_id if data.playlist_type == "personal" else None,
+            owner_user_id=user_id if data.playlist_type in {"personal", "shared"} else None,
             owner_guild_id=data.owner_guild_id if data.playlist_type == "server" else None,
         )
         self.db.add(playlist)

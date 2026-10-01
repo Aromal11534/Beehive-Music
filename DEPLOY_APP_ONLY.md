@@ -19,7 +19,7 @@ The compose file attaches Beehive services to the existing `baota_net` Docker br
 cp env.server.example .env.server
 ```
 
-2. Edit `.env.server` and set the real Postgres, Redis, Discord, JWT, Lavalink, and MFA values.
+2. Edit `.env.server` and set the real Postgres, Redis, Discord, JWT, internal-service, Lavalink, and cipher values. The two Discord redirect variables must match each other and the Developer Portal exactly.
 
 3. Start the application services:
 
@@ -27,19 +27,13 @@ cp env.server.example .env.server
 docker compose --env-file .env.server -f docker-compose.app.yml up -d --build
 ```
 
-4. Run database migrations:
-
-```bash
-docker compose --env-file .env.server -f docker-compose.app.yml exec api alembic upgrade head
-```
-
-5. Create/administer users:
+4. Migrations run automatically before the API. Create/administer users when needed:
 
 ```bash
 docker compose --env-file .env.server -f docker-compose.app.yml run --rm admin
 ```
 
-6. Deploy Discord slash commands:
+5. Deploy Discord slash commands:
 
 ```bash
 docker compose --env-file .env.server -f docker-compose.app.yml exec bot node dist/deploy-commands.js

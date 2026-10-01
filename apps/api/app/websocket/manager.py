@@ -7,7 +7,7 @@ from typing import Dict, Set
 from fastapi import WebSocket
 
 from app.core.redis import redis_client
-from app.schemas.player import normalize_bot_state
+from app.schemas.player import normalize_bot_message
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, Set[WebSocket]] = {}
         self._subscriber_task: asyncio.Task | None = None
+        self._stopping = False
 
     async def connect(self, websocket: WebSocket, guild_id: str):
         await websocket.accept()
@@ -84,37 +85,64 @@ class ConnectionManager:
             await db.commit()
 
     async def start_redis_subscriber(self):
-        """Subscribe to Redis pub/sub for player state events."""
-        pubsub = redis_client.pubsub()
-        await pubsub.psubscribe("player:*", "bot_event:*")
-        logger.info("Redis subscriber started for player:* and bot_event:* channels")
+        """Subscribe to Redis and reconnect with backoff after transient failure."""
+        retry_delay = 1.0
+        while not self._stopping:
+            pubsub = redis_client.pubsub()
+            try:
+                await pubsub.psubscribe("player:*", "bot_event:*")
+                logger.info("Redis subscriber started for player:* and bot_event:* channels")
+                retry_delay = 1.0
 
-        async for message in pubsub.listen():
-            if message["type"] == "pmessage":
-                channel = message["channel"]
-                if channel.startswith("player:"):
-                    guild_id = channel.split(":", 1)[1] if ":" in channel else None
-                    if guild_id:
+                async for message in pubsub.listen():
+                    if message["type"] != "pmessage":
+                        continue
+                    channel = message["channel"]
+                    if channel.startswith("player:"):
+                        guild_id = channel.split(":", 1)[1] if ":" in channel else None
+                        if not guild_id:
+                            continue
                         try:
                             raw = json.loads(message["data"])
-                            # Normalize bot's camelCase to snake_case for the web client
-                            normalized = normalize_bot_state(raw)
+                            # Player state needs case normalization; command ACKs must
+                            # retain their request ID so the web Promise can settle.
+                            normalized = normalize_bot_message(raw)
                             await self.broadcast_to_guild(guild_id, normalized)
                         except json.JSONDecodeError:
                             logger.warning("Failed to decode player state for guild %s", guild_id)
                         except Exception as e:
                             logger.error("Error broadcasting to guild %s: %s", guild_id, e)
-                elif channel == "bot_event:track_start":
-                    try:
-                        payload = json.loads(message["data"])
-                        await self.handle_track_start(payload)
-                    except Exception as e:
-                        logger.error("Failed to handle track start event: %s", e)
+                    elif channel == "bot_event:track_start":
+                        try:
+                            payload = json.loads(message["data"])
+                            await self.handle_track_start(payload)
+                        except Exception as e:
+                            logger.error("Failed to handle track start event: %s", e)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                if not self._stopping:
+                    logger.warning(
+                        "Redis subscriber stopped (%s); retrying in %.1fs",
+                        type(exc).__name__,
+                        retry_delay,
+                    )
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, 30.0)
+            finally:
+                try:
+                    await pubsub.aclose()
+                except Exception:
+                    pass
 
     def start_background_subscriber(self):
+        if self._subscriber_task and not self._subscriber_task.done():
+            return
+        self._stopping = False
         self._subscriber_task = asyncio.create_task(self.start_redis_subscriber())
 
     async def stop(self):
+        self._stopping = True
         if self._subscriber_task:
             self._subscriber_task.cancel()
             try:

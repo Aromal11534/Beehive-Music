@@ -46,11 +46,17 @@ def create_refresh_token(data: dict[str, Any], expires_delta: timedelta | None =
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
-    return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+    payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+    if payload.get("type") != "access":
+        raise jwt.InvalidTokenError("Token is not an access token")
+    return payload
 
 
 def decode_refresh_token(token: str) -> dict[str, Any]:
-    return jwt.decode(token, settings.jwt_refresh_secret_key, algorithms=[settings.jwt_algorithm])
+    payload = jwt.decode(token, settings.jwt_refresh_secret_key, algorithms=[settings.jwt_algorithm])
+    if payload.get("type") != "refresh":
+        raise jwt.InvalidTokenError("Token is not a refresh token")
+    return payload
 
 
 # ── Token Hashing (for DB storage) ─────────────────────

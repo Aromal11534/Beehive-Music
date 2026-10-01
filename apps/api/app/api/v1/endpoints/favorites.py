@@ -1,5 +1,7 @@
 """Favorites endpoints."""
 
+import logging
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +13,7 @@ from app.services.favorite_service import FavoriteService
 from app.models.user import User
 
 router = APIRouter(prefix="/favorites", tags=["Favorites"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=list[FavoriteResponse])
@@ -71,11 +74,15 @@ async def import_favorites(
     
     for track_data in imported_data["tracks"]:
         try:
-            fav_create = FavoriteCreate(**track_data)
-            fav = await service.add_favorite(current_user.id, fav_create)
+            async with db.begin_nested():
+                fav_create = FavoriteCreate(**track_data)
+                fav = await service.add_favorite(current_user.id, fav_create)
             added_favorites.append(fav)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Skipped favorite import track title=%r error=%s",
+                track_data.get("track_title"),
+                type(exc).__name__,
+            )
             
     return await service.list_favorites(current_user.id)
-

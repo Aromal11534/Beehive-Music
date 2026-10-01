@@ -15,7 +15,10 @@ class LocalStorageBackend(StorageBackend):
         self.base_path.mkdir(parents=True, exist_ok=True)
 
     async def save(self, filename: str, data: bytes, content_type: str) -> str:
-        ext = Path(filename).suffix or self._ext_from_content_type(content_type)
+        # The caller-provided filename is untrusted. Derive the served extension
+        # only from the validated content type so HTML cannot be stored under an
+        # executable same-origin extension.
+        ext = self._ext_from_content_type(content_type)
         unique_name = f"{uuid.uuid4().hex}{ext}"
         file_path = self.base_path / unique_name
 

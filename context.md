@@ -57,9 +57,9 @@ A critical aspect of this system is how the Web UI controls the Discord Bot with
    - The FastAPI backend subscribes to `player:*`, normalizes the bot payload, and streams the state over an open WebSocket connection to the Next.js web client.
 
 2. **Remote Control (Web -> Bot):**
-   - When a user clicks a button on the Web UI, the web client sends a JSON action payload through the WebSocket to the FastAPI backend.
+   - When a user clicks a button on the Web UI, the web client sends a bounded JSON action with a UUID request ID through the WebSocket to the FastAPI backend.
    - FastAPI publishes it to a Redis channel named `web_command:{guild_id}`.
-   - The Node.js Discord Bot subscribes to `web_command:*`. When it receives a command, it parses the action (e.g., `play`, `pause`, `remove`, `move`, `jump`, `shuffle`) and executes the corresponding method on its internal `MusicManager` or `QueueManager`.
+   - The Node.js Discord Bot subscribes to `web_command:*`, executes the command, and publishes a `command_result` acknowledgement. The web client updates only after that acknowledgement succeeds.
 
 ## Recent Development History (Compacted)
 
@@ -81,8 +81,8 @@ After deploying Beehive Music to production, YouTube blocked automated stream tr
 
 ### Workarounds Implemented:
 1. **YouTube Music Primary:** Set the bot default search to `ytmsearch`.
-2. **YouTube OAuth:** Enabled YouTube OAuth in Lavalink, persisting the OAuth refresh token via environment config (`.env.server`).
-3. **YT-Cipher Service:** Added a self-hosted `yt-cipher` service to decipher YouTube's signature logic remotely. Lavalink is configured to use this internal endpoint.
+2. **Bundled YouTube source:** The pinned Lavalink image installs and checksum-verifies the `youtube-source` plugin.
+3. **YT-Cipher Service:** A pinned self-hosted `yt-cipher` service handles signature logic. YouTube OAuth is currently disabled in `infra/lavalink/application.yml`.
 
 *Note: `beehive-yt-cipher` is an internal helper container and does not expose a public port. Ensure `.env.server` (containing OAuth & Cipher keys) is never committed.*
 

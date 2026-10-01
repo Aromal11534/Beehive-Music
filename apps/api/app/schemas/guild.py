@@ -50,7 +50,7 @@ class ServerSettingsUpdate(BaseModel):
     autoplay_enabled: bool | None = None
     default_volume: int | None = Field(None, ge=0, le=200)
     loop_mode: str | None = Field(None, pattern=r"^(off|track|queue)$")
-    max_queue_size: int | None = Field(None, ge=1, le=10000)
+    max_queue_size: int | None = Field(None, ge=1, le=500)
     max_song_duration: int | None = Field(None, ge=1)
     restricted_mode: bool | None = None
 

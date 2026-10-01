@@ -8,6 +8,7 @@ interface GuildContextType {
   guilds: GuildAccess[];
   selectedGuild: string;
   setSelectedGuild: (id: string) => void;
+  removeGuild: (guildId: number) => void;
   isLoading: boolean;
 }
 
@@ -44,8 +45,19 @@ export function GuildProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('beehive_selected_guild', id);
   };
 
+  const removeGuild = (guildId: number) => {
+    const remaining = guilds.filter((access) => access.guild_id !== guildId);
+    setGuilds(remaining);
+    if (!remaining.some((access) => access.guild?.discord_guild_id === selectedGuild)) {
+      const nextGuild = remaining[0]?.guild?.discord_guild_id || '';
+      setSelectedGuildState(nextGuild);
+      if (nextGuild) localStorage.setItem('beehive_selected_guild', nextGuild);
+      else localStorage.removeItem('beehive_selected_guild');
+    }
+  };
+
   return (
-    <GuildContext.Provider value={{ guilds, selectedGuild, setSelectedGuild, isLoading }}>
+    <GuildContext.Provider value={{ guilds, selectedGuild, setSelectedGuild, removeGuild, isLoading }}>
       {children}
     </GuildContext.Provider>
   );

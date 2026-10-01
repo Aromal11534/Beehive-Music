@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import type { GuildAccess, TrackHistoryEntry } from '@/lib/types';
 import { Icon, type IconName } from '@/components/icons';
@@ -16,6 +17,8 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [systemOnline, setSystemOnline] = useState<boolean | null>(null);
   const { state } = usePlayer();
   const track = state?.current_track;
   const isPlaying = !!(state && state.is_playing && !state.is_paused);
@@ -23,18 +26,28 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadDashboard() {
       try {
-        const [guildsData, historyData, statsData] = await Promise.all([
-          api.get<GuildAccess[]>('/guilds/my').catch(() => []),
-          api.get<TrackHistoryEntry[]>('/history?limit=5').catch(() => []),
-          api.get<{ total_users: number, active_players: number }>('/stats').catch(() => ({ total_users: 0, active_players: 0 })),
+        const [guildsResult, historyResult, statsResult] = await Promise.allSettled([
+          api.get<GuildAccess[]>('/guilds/my'),
+          api.get<TrackHistoryEntry[]>('/history?limit=5'),
+          api.get<{ total_users: number, active_players: number }>('/stats'),
         ]);
+
+        const guildsData = guildsResult.status === 'fulfilled' ? guildsResult.value : [];
+        const historyData = historyResult.status === 'fulfilled' ? historyResult.value : [];
+        const statsData = statsResult.status === 'fulfilled' ? statsResult.value : null;
+        const failedCount = [guildsResult, historyResult, statsResult].filter((result) => result.status === 'rejected').length;
+
+        setSystemOnline(statsResult.status === 'fulfilled');
+        setLoadError(failedCount > 0 ? `${failedCount} dashboard ${failedCount === 1 ? 'request' : 'requests'} failed. Some data may be unavailable.` : null);
         setStats({
-          active_players: statsData?.active_players || 0,
+          active_players: statsData?.active_players ?? 0,
           total_guilds: Array.isArray(guildsData) ? guildsData.length : 0,
-          total_users: statsData?.total_users || 0,
+          total_users: statsData?.total_users ?? 0,
           recent_tracks: Array.isArray(historyData) ? historyData : [],
         });
       } catch {
+        setSystemOnline(false);
+        setLoadError('Dashboard data is currently unavailable.');
         setStats({ active_players: 0, total_guilds: 0, total_users: 0, recent_tracks: [] });
       }
     }
@@ -46,7 +59,7 @@ export default function DashboardPage() {
     { label: 'Active Players', value: stats?.active_players || 0, icon: 'music', color: 'from-amber-500/20 to-amber-600/10' },
     { label: 'Connected Servers', value: stats?.total_guilds || 0, icon: 'server', color: 'from-blue-500/20 to-blue-600/10' },
     { label: 'Total Users', value: stats?.total_users || 0, icon: 'users', color: 'from-emerald-500/20 to-emerald-600/10' },
-    { label: 'System Status', value: 'Online', icon: 'check-circle', color: 'from-green-500/20 to-green-600/10' },
+    { label: 'System Status', value: systemOnline === null ? 'Checking' : systemOnline ? 'Online' : 'Unavailable', icon: 'check-circle', color: systemOnline ? 'from-green-500/20 to-green-600/10' : 'from-red-500/20 to-red-600/10' },
   ];
 
   return (
@@ -70,6 +83,10 @@ export default function DashboardPage() {
                   <h1 className="mt-2 text-4xl font-black tracking-tight text-white md:text-5xl">Dashboard</h1>
                   <p className="mt-3 max-w-xl text-sm text-zinc-300">Monitor your Beehive music system, connected servers, and recent activity.</p>
                 </div>
+
+                {loadError ? (
+                  <div className="relative mt-5 rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">{loadError}</div>
+                ) : null}
 
                 {/* Stats Grid inside the banner to make it pop */}
                 <div className="relative mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -135,7 +152,7 @@ export default function DashboardPage() {
                       { label: 'View Queue', desc: 'Manage upcoming', href: '/queue', icon: 'queue' as IconName },
                       { label: 'Playlists', desc: 'Your collections', href: '/playlists', icon: 'disc' as IconName },
                     ].map((action) => (
-                      <a
+                      <Link
                         key={action.href}
                         href={action.href}
                         className="group flex flex-col items-start p-4 rounded-2xl bg-white/5 hover:bg-white/10 ring-1 ring-white/5 hover:ring-amber-500/30 transition-all"
@@ -145,7 +162,7 @@ export default function DashboardPage() {
                         </div>
                         <span className="text-sm font-semibold text-white">{action.label}</span>
                         <span className="text-xs text-zinc-400 mt-0.5">{action.desc}</span>
-                      </a>
+                      </Link>
                     ))}
                   </div>
                 </div>

@@ -20,6 +20,7 @@ export class QueueManager {
   public current: QueueTrack | null = null;
   public loopMode: LoopMode = 'off';
   public volume: number = 80;
+  public maxSize: number = 500;
   private nextQueueId = 1;
 
   private withQueueId(track: QueueTrack): QueueTrack {
@@ -41,20 +42,25 @@ export class QueueManager {
     return queue;
   }
 
-  add(track: QueueTrack): void {
+  add(track: QueueTrack): boolean {
+    if (this.tracks.length >= this.maxSize) return false;
     this.tracks.push(this.withQueueId(track));
+    return true;
   }
 
   addNext(track: QueueTrack): void {
+    if (this.tracks.length >= this.maxSize) this.tracks.pop();
     this.tracks.unshift(this.withQueueId(track));
   }
 
-  addMany(tracks: QueueTrack[]): void {
+  addMany(tracks: QueueTrack[]): number {
+    if (tracks.length > this.maxSize - this.tracks.length) return 0;
     this.tracks.push(...tracks.map((track) => this.withQueueId(track)));
+    return tracks.length;
   }
 
-  next(): QueueTrack | null {
-    if (this.loopMode === 'track' && this.current) {
+  next(ignoreTrackLoop = false): QueueTrack | null {
+    if (!ignoreTrackLoop && this.loopMode === 'track' && this.current) {
       return this.current;
     }
 
@@ -117,6 +123,12 @@ export class QueueManager {
 
   clear(): void {
     this.tracks = [];
+  }
+
+  reset(): void {
+    this.tracks = [];
+    this.history = [];
+    this.current = null;
   }
 
   toSnapshot(): QueueSnapshot {

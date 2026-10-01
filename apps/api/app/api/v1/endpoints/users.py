@@ -5,7 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user, get_admin_user
-from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserListResponse, UserProfileUpdate
+from app.schemas.user import (
+    AdminPasswordResetRequest,
+    UserCreate,
+    UserUpdate,
+    UserResponse,
+    UserListResponse,
+    UserProfileUpdate,
+)
 from app.schemas.common import MessageResponse
 from app.services.user_service import UserService
 from app.models.user import User
@@ -119,11 +126,11 @@ async def delete_user(
 @router.post("/{user_id}/reset-password", response_model=MessageResponse)
 async def admin_reset_password(
     user_id: int,
-    new_password: str = Query(..., min_length=8),
+    body: AdminPasswordResetRequest,
     admin: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Reset a user's password (admin only)."""
     service = UserService(db)
-    await service.reset_password(user_id, new_password)
+    await service.reset_password(user_id, body.new_password)
     return {"message": "Password reset successfully"}

@@ -1,5 +1,7 @@
 """Player state and queue schemas for realtime data."""
 
+import uuid
+
 from pydantic import BaseModel, Field
 
 
@@ -59,3 +61,31 @@ def normalize_bot_state(raw: dict) -> dict:
         "queue": [normalize_track(t, i) for i, t in enumerate(queue_raw)],
         "queue_length": len(queue_raw),
     }
+
+
+def normalize_bot_message(raw: object) -> dict:
+    """Validate command acknowledgements and normalize only player-state messages."""
+    if not isinstance(raw, dict):
+        raise ValueError("Bot message must be an object")
+    if raw.get("type") != "command_result":
+        return normalize_bot_state(raw)
+
+    request_id = raw.get("request_id")
+    if not isinstance(request_id, str):
+        raise ValueError("Command result request_id is required")
+    try:
+        request_id = str(uuid.UUID(request_id))
+    except ValueError as exc:
+        raise ValueError("Command result request_id must be a UUID") from exc
+    if not isinstance(raw.get("ok"), bool):
+        raise ValueError("Command result ok must be a boolean")
+
+    result = {
+        "type": "command_result",
+        "request_id": request_id,
+        "ok": raw["ok"],
+    }
+    error = raw.get("error")
+    if isinstance(error, str) and error:
+        result["error"] = error[:500]
+    return result

@@ -25,6 +25,10 @@ class UserProfileUpdate(BaseModel):
     email: EmailStr | None = None
 
 
+class AdminPasswordResetRequest(BaseModel):
+    new_password: str = Field(..., min_length=12, max_length=128)
+
+
 class UserResponse(BaseModel):
     id: int
     username: str

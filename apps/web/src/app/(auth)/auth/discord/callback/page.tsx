@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { getDiscordRedirectUri } from '@/lib/discord-oauth';
+import { consumeDiscordOAuthState, getDiscordRedirectUri } from '@/lib/discord-oauth';
 import { useAuth } from '@/context/AuthContext';
 
 interface DiscordSyncResponse {
@@ -25,24 +25,29 @@ function DiscordCallbackInner() {
 
   useEffect(() => {
     if (hasAttempted.current) return;
-    
+    hasAttempted.current = true;
+
     const code = searchParams.get('code');
     const error = searchParams.get('error');
-    const state = searchParams.get('state');
+    const flow = consumeDiscordOAuthState(searchParams.get('state'));
+
+    if (!flow) {
+      setTimeout(() => setStatus('Invalid or expired Discord sign-in response. Please try again.'), 0);
+      setTimeout(() => router.replace('/login'), 3000);
+      return;
+    }
 
     if (error) {
       setTimeout(() => setStatus(`Discord connection failed: ${error}`), 0);
-      setTimeout(() => router.push('/servers'), 3000);
+      setTimeout(() => router.replace(flow === 'login' ? '/login' : '/servers'), 3000);
       return;
     }
 
     if (!code) {
       setTimeout(() => setStatus('Invalid callback URL.'), 0);
-      setTimeout(() => router.push('/servers'), 3000);
+      setTimeout(() => router.replace(flow === 'login' ? '/login' : '/servers'), 3000);
       return;
     }
-
-    hasAttempted.current = true;
 
     const redirectUri = getDiscordRedirectUri();
     if (!redirectUri) {
@@ -51,7 +56,7 @@ function DiscordCallbackInner() {
       return;
     }
 
-    if (state === 'login') {
+    if (flow === 'login') {
       setTimeout(() => setStatus('Logging you in...'), 0);
       
       api.post<DiscordLoginResponse>('/auth/discord/login', {
@@ -61,12 +66,12 @@ function DiscordCallbackInner() {
         .then(async (res) => {
           await setAuthData(res);
           setStatus('Success! Redirecting...');
-          setTimeout(() => router.push('/'), 1500);
+          setTimeout(() => router.replace('/'), 1500);
         })
         .catch((error: unknown) => {
           console.error('Discord login error:', error);
           setStatus('Failed to login via Discord.');
-          setTimeout(() => router.push('/login'), 3000);
+          setTimeout(() => router.replace('/login'), 3000);
         });
         
     } else {
@@ -78,12 +83,12 @@ function DiscordCallbackInner() {
       })
         .then((res) => {
           setStatus(`Success! Linked as ${res.discord_username}. Synced ${res.synced_guilds} server(s).`);
-          setTimeout(() => router.push('/servers'), 3000);
+          setTimeout(() => router.replace('/servers'), 3000);
         })
         .catch((error: unknown) => {
           console.error('Discord sync error:', error);
           setStatus('Failed to connect to Discord. Ensure the server is configured properly.');
-          setTimeout(() => router.push('/servers'), 3000);
+          setTimeout(() => router.replace('/servers'), 3000);
         });
     }
   }, [searchParams, router, setAuthData]);

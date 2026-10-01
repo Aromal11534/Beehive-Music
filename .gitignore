@@ -58,6 +58,8 @@ htmlcov/
 .nyc_output/
 
 # Misc
+.cache
+.cache/
 *.bak
 *.tmp
 *.temp

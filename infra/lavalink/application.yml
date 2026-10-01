@@ -5,9 +5,6 @@ server:
     enabled: false
 
 lavalink:
-  plugins:
-    - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.2"
-      snapshot: false
   server:
     password: "${LAVALINK_SERVER_PASSWORD:youshallnotpass}"
     sources:
@@ -16,7 +13,8 @@ lavalink:
       soundcloud: true
       twitch: true
       vimeo: true
-      http: true
+      # Do not let user-supplied web URLs turn Lavalink into an internal HTTP client.
+      http: false
       local: false
     filters:
       volume: true

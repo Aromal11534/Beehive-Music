@@ -30,15 +30,21 @@ These credentials allow the application to control, run, and identify your Disco
 *   **`DISCORD_CLIENT_ID`**
     *   **What it is:** The public identification tag for your Discord application.
     *   **How to get it:** In the Developer Portal, go to the **OAuth2** -> **General** tab and copy the **Client ID**.
+*   **`DISCORD_CLIENT_SECRET`**
+    *   **What it is:** The server-only secret used by the API to exchange an OAuth authorization code.
+    *   **How to get it:** In **OAuth2** -> **General**, reset/copy the Client Secret. Never expose it as a `NEXT_PUBLIC_*` value.
 *   **`NEXT_PUBLIC_DISCORD_REDIRECT_URI`**
     *   **What it is:** The exact browser callback used for Discord login and account sync.
     *   **How to configure it:** Add the same value under **OAuth2** -> **Redirects** in the Discord Developer Portal. For local Docker development use `http://localhost:3000/auth/discord/callback`; production should use `https://beehive.teamsyndicate.org/auth/discord/callback`.
+*   **`DISCORD_REDIRECT_URI`**
+    *   **What it is:** The API's exact callback allowlist value.
+    *   **How to configure it:** Set it to exactly the same value as `NEXT_PUBLIC_DISCORD_REDIRECT_URI`, including scheme, host, port, path, and trailing slash behavior.
 *   **`DISCORD_DEV_GUILD_ID`** *(Optional)*
     *   **What it is:** The Server ID of your personal testing server. Using this makes Slash Commands update instantly during development instead of taking up to an hour globally.
     *   **How to get it:** Enable "Developer Mode" in your Discord client settings (Advanced), then right-click your server's icon in Discord and click **Copy Server ID**.
 
 ### 2. Security & Encryption Keys
-These keys are used by the backend to safely encrypt user login sessions and Multi-Factor Authentication (MFA) codes. **Do not use simple words for these.**
+These keys are used by the backend to sign Discord login sessions and authenticate internal service requests. **Do not use simple words for these.**
 
 *   **`JWT_SECRET_KEY`** & **`JWT_REFRESH_SECRET_KEY`**
     *   **What it is:** Cryptographic hashes used to sign and verify user login sessions.
@@ -46,12 +52,9 @@ These keys are used by the backend to safely encrypt user login sessions and Mul
         ```bash
         python -c "import secrets; print(secrets.token_hex(32))"
         ```
-*   **`MFA_ENCRYPTION_KEY`**
-    *   **What it is:** A specialized Fernet key used to uniquely encrypt sensitive user MFA seed recovery codes before storing them in the database.
-    *   **How to get it:** You must generate a highly specific valid 32-byte url-safe base64-encoded key. Open a terminal where Python is installed and run:
-        ```bash
-        python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-        ```
+*   **`INTERNAL_API_TOKEN`** *(app-only/non-Docker deployments)*
+    *   **What it is:** A third, independent 32+ character secret shared only by the API and bot. The main local Docker compose generates it automatically in a private volume.
+    *   **How to get it:** Generate another random value; do not reuse either JWT secret.
 
 ### 3. Databases and Microservices
 These passwords act as the internal security connecting the different containerized pieces of your application (Database, Caching, and Music Nodes).

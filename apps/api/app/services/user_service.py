@@ -1,13 +1,13 @@
 """User management service."""
 
 from datetime import datetime, timezone
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.security import hash_password, verify_password
 from app.core.exceptions import NotFoundError, ConflictError, AuthenticationError
-from app.models.user import User, UserMfa
+from app.models.user import User, UserMfa, UserSession
 from app.schemas.user import UserCreate, UserUpdate, UserProfileUpdate
 
 
@@ -99,6 +99,7 @@ class UserService:
         user.password_hash = hash_password(new_password)
         user.force_password_change = False
         user.updated_at = datetime.now(timezone.utc)
+        await self._revoke_sessions(user_id)
         await self.db.flush()
         return True
 
@@ -107,8 +108,19 @@ class UserService:
         user = await self.get_user(user_id)
         user.password_hash = hash_password(new_password)
         user.updated_at = datetime.now(timezone.utc)
+        await self._revoke_sessions(user_id)
         await self.db.flush()
         return True
+
+    async def _revoke_sessions(self, user_id: int) -> None:
+        await self.db.execute(
+            update(UserSession)
+            .where(
+                UserSession.user_id == user_id,
+                UserSession.revoked_at.is_(None),
+            )
+            .values(revoked_at=datetime.now(timezone.utc))
+        )
 
     async def delete_user(self, user_id: int) -> bool:
         user = await self.get_user(user_id)
