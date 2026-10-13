@@ -123,18 +123,6 @@ export default function ServersPage() {
         <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{loadError}</div>
       ) : null}
 
-      <div className="glass-card p-5 border-amber-500/10">
-        <div className="flex items-start gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400">
-            <Icon name="shield" className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-zinc-200">Invite requirements</h2>
-            <p className="mt-1 text-sm text-zinc-500">Discord will show servers where your account can add apps. The invite includes bot access and slash command registration.</p>
-          </div>
-        </div>
-      </div>
-
       {isLoading ? (
         <div className="flex h-48 items-center justify-center text-zinc-400"><Icon name="loader" className="mr-2 h-5 w-5 animate-spin" /> Loading servers...</div>
       ) : loadError && guilds.length === 0 ? (
