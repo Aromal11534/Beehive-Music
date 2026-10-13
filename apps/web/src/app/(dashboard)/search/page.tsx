@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
-import { api } from '@/lib/api';
+import { toast } from 'sonner';
+import { api, ApiError } from '@/lib/api';
 import type { GuildAccess } from '@/lib/types';
 import { Icon } from '@/components/icons';
 
@@ -78,9 +79,10 @@ export default function SearchPage() {
       });
       setFeedback({ idx, msg: action === 'play' ? '▶ Playing' : '➕ Queued' });
       setTimeout(() => setFeedback(null), 2000);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      alert("Failed to send command to the bot.");
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Failed to send command to the bot.";
+      toast.error(msg);
     }
   }, [selectedGuild]);
 

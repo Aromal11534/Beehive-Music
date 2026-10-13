@@ -43,14 +43,16 @@ plugins:
     allowDirectPlaylistIds: true
     clients:
       - MUSIC
-      - TV
-      - WEB
-      - WEBEMBEDDED
+      - ANDROID_MUSIC
       - MWEB
-      - ANDROID_VR
+      - WEB
+      - IOS
       - TVHTML5_SIMPLY
+      - ANDROID_VR
+      - WEBEMBEDDED
     oauth:
-      enabled: false
+      enabled: true
+      skipInitialization: true
       # refreshToken: "${YOUTUBE_OAUTH_REFRESH_TOKEN:}"
     remoteCipher:
       url: "http://yt-cipher:8001"

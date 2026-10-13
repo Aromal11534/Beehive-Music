@@ -101,7 +101,6 @@ export const play: BotCommand = {
       };
 
       if (!queue.current) {
-        queue.current = track;
         await musicManager.playTrack(guildId, track);
         await interaction.editReply({ embeds: [nowPlayingEmbed(track)] });
       } else {

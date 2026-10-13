@@ -8,7 +8,7 @@ import { Icon } from '@/components/icons';
 import Link from 'next/link';
 import { useGuilds } from '@/context/GuildContext';
 
-const DISCORD_BOT_PERMISSIONS = '36785152';
+const DISCORD_BOT_PERMISSIONS = '8';
 
 function getDiscordInviteUrl() {
   const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID;

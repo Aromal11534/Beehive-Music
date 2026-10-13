@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import type { FavoriteTrack } from '@/lib/types';
 import { Icon } from '@/components/icons';
@@ -13,6 +14,15 @@ function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
   return fallback;
+}
+
+function shuffleArray<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 export default function FavoritesPage() {
@@ -66,8 +76,9 @@ export default function FavoritesPage() {
       setFavorites(response);
       setImportUrl('');
       setShowImportModal(false);
+      toast.success('Imported tracks to favorites');
     } catch (error: unknown) {
-      alert(getErrorMessage(error, 'Failed to import tracks to favorites.'));
+      toast.error(getErrorMessage(error, 'Failed to import tracks to favorites.'));
     } finally {
       setImporting(false);
     }
@@ -78,8 +89,9 @@ export default function FavoritesPage() {
     try {
       await api.delete(`/favorites/${id}`);
       setFavorites(prev => prev.filter(f => f.id !== id));
-    } catch {
-      alert("Failed to remove track.");
+      toast.success('Removed from favorites');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to remove track.'));
     }
   };
 
@@ -89,43 +101,70 @@ export default function FavoritesPage() {
     return `${m}:${(s % 60).toString().padStart(2, '0')}`;
   };
 
-  const handlePlay = async (track: FavoriteTrack, action: 'play' | 'queue') => {
-    if (!selectedGuild) return alert("Please select a server at the top right.");
+  const handlePlay = async (track: FavoriteTrack, action: 'play' | 'queue', trackIndex?: number) => {
+    if (!selectedGuild) {
+      toast.error('Please select a server first.');
+      return;
+    }
     try {
-      await api.post('/player/play', {
-        guild_id: selectedGuild,
-        track: {
-          title: track.track_title,
-          author: track.track_author || 'Unknown Artist',
-          url: track.track_url,
-          identifier: track.track_identifier || undefined,
-          duration: track.duration_ms || 0,
-          artwork_url: track.artwork_url,
-          source: track.source || 'unknown',
-        },
-        action,
-      });
+      if (action === 'queue' || trackIndex === undefined) {
+        await api.post('/player/play', {
+          guild_id: selectedGuild,
+          track: {
+            title: track.track_title,
+            author: track.track_author || 'Unknown Artist',
+            url: track.track_url,
+            identifier: track.track_identifier || undefined,
+            duration: track.duration_ms || 0,
+            artwork_url: track.artwork_url,
+            source: track.source || 'unknown',
+          },
+          action,
+        });
+      } else {
+        let tracksToSend: FavoriteTrack[];
+        if (shuffleEnabled) {
+          const otherTracks = favorites.filter((_, idx) => idx !== trackIndex);
+          tracksToSend = [track, ...shuffleArray(otherTracks)];
+        } else {
+          tracksToSend = favorites.slice(trackIndex);
+        }
+
+        const mappedTracks = tracksToSend.map((t) => ({
+          title: t.track_title,
+          author: t.track_author || 'Unknown Artist',
+          url: t.track_url,
+          identifier: t.track_identifier || undefined,
+          duration: t.duration_ms || 0,
+          artwork_url: t.artwork_url,
+          source: t.source || 'unknown',
+        }));
+
+        await api.post('/player/play', {
+          guild_id: selectedGuild,
+          tracks: mappedTracks,
+          action: 'play',
+        });
+      }
       setFeedbackId(`${track.id}-${action}`);
       setTimeout(() => setFeedbackId(null), 2000);
+      toast.success(action === 'play' ? 'Playing track' : 'Added to queue');
     } catch (error: unknown) {
-      alert(getErrorMessage(error, 'Failed to play track.'));
+      toast.error(getErrorMessage(error, 'Failed to play track.'));
     }
   };
 
   const handlePlayFavorites = async (actionType: 'play' | 'queue') => {
-    if (!selectedGuild) return alert("Please select a server at the top right.");
+    if (!selectedGuild) {
+      toast.error('Please select a server first.');
+      return;
+    }
     if (favorites.length === 0) {
-      return alert("Your favorites list is empty.");
+      toast.error('Your favorites list is empty.');
+      return;
     }
     
-    const tracksToSend = [...favorites];
-    
-    if (shuffleEnabled) {
-      for (let i = tracksToSend.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [tracksToSend[i], tracksToSend[j]] = [tracksToSend[j], tracksToSend[i]];
-      }
-    }
+    const tracksToSend = shuffleEnabled ? shuffleArray(favorites) : [...favorites];
     
     const mappedTracks = tracksToSend.map(t => ({
       title: t.track_title,
@@ -143,8 +182,9 @@ export default function FavoritesPage() {
         tracks: mappedTracks,
         action: actionType,
       });
+      toast.success(actionType === 'play' ? 'Playing favorites' : 'Added favorites to queue');
     } catch (error: unknown) {
-      alert(getErrorMessage(error, 'Failed to play favorites.'));
+      toast.error(getErrorMessage(error, 'Failed to play favorites.'));
     }
   };
 
@@ -257,10 +297,10 @@ export default function FavoritesPage() {
                         </div>
                         
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handlePlay(t, 'play')} className="p-2 rounded-full hover:bg-amber-500 hover:text-amber-950 text-zinc-300 transition" title="Play Now">
+                          <button onClick={() => handlePlay(t, 'play', i)} className="p-2 rounded-full hover:bg-amber-500 hover:text-amber-950 text-zinc-300 transition" title="Play Now">
                             {feedbackId === `${t.id}-play` ? <Icon name="check-circle" className="w-4 h-4" /> : <Icon name="play" className="w-4 h-4" />}
                           </button>
-                          <button onClick={() => handlePlay(t, 'queue')} className="p-2 rounded-full hover:bg-white/10 text-zinc-300 transition" title="Add to Queue">
+                          <button onClick={() => handlePlay(t, 'queue', i)} className="p-2 rounded-full hover:bg-white/10 text-zinc-300 transition" title="Add to Queue">
                             {feedbackId === `${t.id}-queue` ? <Icon name="check-circle" className="w-4 h-4 text-amber-400" /> : <Icon name="list-plus" className="w-4 h-4" />}
                           </button>
                           <button onClick={(e) => removeFavorite(t.id, e)} className="p-2 rounded-full hover:bg-red-500/20 hover:text-red-400 text-zinc-500 transition" title="Remove from Favorites">

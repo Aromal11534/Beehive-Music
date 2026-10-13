@@ -19,6 +19,7 @@ interface PlaybackAttempt {
   generation: number;
   triedNodes: Set<string>;
   handledFailures: Set<string>;
+  triedEncodings: Set<string>;
   pendingFailures: Array<{ nodeName: string; encoded?: string }>;
   encoded?: string;
   recovering: boolean;
@@ -168,37 +169,81 @@ export class MusicManager {
     return undefined;
   }
 
-  private getFirstResolvedTrack(result: LavalinkResponse | undefined): Track | null {
+  private getBestResolvedTrack(result: LavalinkResponse | undefined): Track | null {
     if (!result) return null;
     if (result.loadType === LoadType.TRACK) return result.data;
-    if (result.loadType === LoadType.SEARCH) return result.data[0] ?? null;
-    if (result.loadType === LoadType.PLAYLIST) return result.data.tracks[0] ?? null;
-    return null;
+    let tracks: Track[] = [];
+    if (result.loadType === LoadType.SEARCH) tracks = result.data;
+    else if (result.loadType === LoadType.PLAYLIST) tracks = result.data.tracks;
+    if (tracks.length === 0) return null;
+
+    const sorted = [...tracks].sort((a, b) => {
+      const aTopic = (a?.info?.author || '').toLowerCase().includes('topic') ? 1 : 0;
+      const bTopic = (b?.info?.author || '').toLowerCase().includes('topic') ? 1 : 0;
+      return bTopic - aTopic;
+    });
+    return sorted[0] ?? null;
   }
 
-  private getTrackResolveIdentifier(track: QueueTrack): string | null {
-    const identifier = track.url || track.identifier;
-    if (!identifier) return null;
-
-    if (track.source === 'spotify' || identifier.includes('spotify.com')) {
-      return `ytmsearch:${track.title} ${track.author}`;
-    }
-
-    return identifier;
+  private isYouTubeOrSpotify(track: QueueTrack): boolean {
+    const url = track.url || track.identifier || '';
+    return (
+      track.source === 'youtube' ||
+      track.source === 'spotify' ||
+      url.includes('youtube.com') ||
+      url.includes('youtu.be') ||
+      url.includes('spotify.com')
+    );
   }
 
   private async resolveTrackOnNode(node: Node, track: QueueTrack): Promise<string | null> {
-    const identifier = this.getTrackResolveIdentifier(track);
+    const cleanTitle = (track.title || '').trim();
+    const cleanAuthor = (
+      track.author && track.author !== 'Unknown' && track.author !== 'Unknown Artist'
+        ? track.author
+        : ''
+    ).trim();
 
-    if (identifier) {
+    const isYtOrSpotify = this.isYouTubeOrSpotify(track);
+
+    // Build candidate identifiers to try in order of preference.
+    const candidateIdentifiers: string[] = [];
+
+    // For YouTube and Spotify tracks:
+    // Direct YouTube video playback on data center IPs is blocked by YouTube bot-detection/sign-in walls.
+    // YouTube Music (ytmsearch) tracks, however, stream reliably via the WEB_REMIX / MUSIC client.
+    // Therefore, always prioritize ytmsearch if title is available.
+    if (isYtOrSpotify && cleanTitle && cleanTitle !== 'Unknown Track') {
+      candidateIdentifiers.push(`ytmsearch:${cleanTitle} ${cleanAuthor}`.trim());
+      if (cleanAuthor) {
+        candidateIdentifiers.push(`ytmsearch:${cleanTitle}`);
+      }
+    }
+
+    const directIdentifier = track.url || track.identifier;
+    if (directIdentifier && !isYtOrSpotify) {
+      // For Soundcloud, Bandcamp, Twitch, Vimeo, etc. direct URL is primary
+      candidateIdentifiers.unshift(directIdentifier);
+    } else if (directIdentifier) {
+      // For YouTube, direct URL is a fallback if ytmsearch finds nothing
+      candidateIdentifiers.push(directIdentifier);
+    }
+
+    // Also generic ytsearch fallback
+    if (cleanTitle && cleanTitle !== 'Unknown Track') {
+      candidateIdentifiers.push(`ytsearch:${cleanTitle} ${cleanAuthor}`.trim());
+    }
+
+    for (const identifier of candidateIdentifiers) {
       try {
         const result = await node.rest.resolve(identifier);
-        const resolvedTrack = this.getFirstResolvedTrack(result);
+        const resolvedTrack = this.getBestResolvedTrack(result);
+
         if (resolvedTrack?.encoded) {
           const actualDuration = resolvedTrack.info.length ?? 0;
           if (
-            track.maxDurationMs
-            && (resolvedTrack.info.isStream || actualDuration > track.maxDurationMs)
+            track.maxDurationMs &&
+            (resolvedTrack.info.isStream || actualDuration > track.maxDurationMs)
           ) {
             throw new PlaybackPolicyError(
               `Track exceeds this server's ${Math.floor(track.maxDurationMs / 1000)} second duration limit`
@@ -217,17 +262,15 @@ export class MusicManager {
           return resolvedTrack.encoded;
         }
 
-        console.warn(`[Player] Node ${node.name} could not resolve ${track.title}`);
+        console.warn(`[Player] Node ${node.name} query "${identifier}" returned no tracks; trying next candidate`);
       } catch (error) {
         if (error instanceof PlaybackPolicyError) throw error;
-        console.warn(`[Player] Node ${node.name} failed to resolve ${track.title}:`, error);
+        console.warn(`[Player] Node ${node.name} failed to resolve query "${identifier}":`, error);
       }
     }
 
     // Encoded tracks are useful for sources that do not expose a resolvable URI.
-    // URL-based tracks are deliberately refreshed above because persisted Lavalink
-    // encodings can become stale or be incompatible with another node.
-    return identifier ? null : track.encoded ?? null;
+    return track.encoded ?? null;
   }
 
   private getPlaybackNodes(player: Player, excludedNodes: Set<string> = new Set()): Node[] {
@@ -354,7 +397,7 @@ export class MusicManager {
     }
     queue.current = null;
 
-    if (failures >= MAX_CONSECUTIVE_PLAYBACK_FAILURES) {
+    if (failures >= 10) {
       console.error(
         `[Player] Pausing queue in guild ${guildId} after ${failures} consecutive playback failures`
       );
@@ -384,6 +427,8 @@ export class MusicManager {
     const failureKey = `${nodeName}:${encoded ?? attempt.encoded ?? 'unknown'}`;
     if (attempt.handledFailures.has(failureKey)) return;
     attempt.handledFailures.add(failureKey);
+    if (encoded) attempt.triedEncodings.add(encoded);
+    if (attempt.encoded) attempt.triedEncodings.add(attempt.encoded);
 
     if (attempt.recovering) {
       attempt.pendingFailures.push({ nodeName, encoded });
@@ -392,14 +437,56 @@ export class MusicManager {
 
     attempt.recovering = true;
     try {
+      let recovered = false;
       const fallbackNodes = this.getPlaybackNodes(player, attempt.triedNodes);
       if (fallbackNodes.length > 0) {
         console.warn(
-          `[Player] Retrying ${attempt.track.title} in guild ${guildId} after node ${nodeName} failed`
+          `[Player] Retrying ${attempt.track.title} in guild ${guildId} on fallback node`
         );
+        recovered = await this.startTrackOnAvailableNode(guildId, player, attempt, fallbackNodes);
       }
 
-      const recovered = await this.startTrackOnAvailableNode(guildId, player, attempt, fallbackNodes);
+      // If node fallback didn't recover, resolve alternate YouTube Music and YouTube streams
+      if (!recovered) {
+        try {
+          const fallbackQuery = `ytmsearch:${attempt.track.title} ${attempt.track.author && attempt.track.author !== 'Unknown' ? attempt.track.author : ''}`.trim();
+          console.warn(`[Player] Playback exception for "${attempt.track.title}" on ${nodeName}; searching fallback via "${fallbackQuery}"`);
+          const result = await player.node.rest.resolve(fallbackQuery);
+          let candidateTracks: Track[] = [];
+          if (result) {
+            if (result.loadType === LoadType.TRACK) candidateTracks = [result.data];
+            else if (result.loadType === LoadType.SEARCH) candidateTracks = result.data;
+            else if (result.loadType === LoadType.PLAYLIST) candidateTracks = result.data.tracks;
+          }
+          // Prioritize Topic / official audio releases
+          const sorted = [...candidateTracks].sort((a, b) => {
+            const aTopic = (a?.info?.author || '').toLowerCase().includes('topic') ? 1 : 0;
+            const bTopic = (b?.info?.author || '').toLowerCase().includes('topic') ? 1 : 0;
+            return bTopic - aTopic;
+          });
+          const fallbackTrack = sorted.find(
+            (t) => t?.encoded && !attempt.triedEncodings.has(t.encoded)
+          );
+          if (fallbackTrack?.encoded) {
+            attempt.triedEncodings.add(fallbackTrack.encoded);
+            attempt.encoded = fallbackTrack.encoded;
+            attempt.track.encoded = fallbackTrack.encoded;
+            attempt.track.url = fallbackTrack.info.uri || attempt.track.url;
+            attempt.track.identifier = fallbackTrack.info.identifier || attempt.track.identifier;
+            await player.playTrack({
+              track: { encoded: fallbackTrack.encoded },
+              paused: false,
+              volume: this.getQueue(guildId).volume,
+            });
+            console.log(`[Player] Fallback stream for "${fallbackTrack.info.title}" started successfully on node ${player.node.name}`);
+            await this.publishState(guildId);
+            recovered = true;
+          }
+        } catch (fallbackError) {
+          console.warn(`[Player] Stream fallback failed for "${attempt.track.title}":`, fallbackError);
+        }
+      }
+
       if (!recovered) {
         await this.advanceAfterPlaybackFailure(guildId, attempt);
       }
@@ -549,6 +636,23 @@ export class MusicManager {
   }
 
   async joinChannel(guildId: string, channelId: string): Promise<Player> {
+    const guild = this.client.guilds.cache.get(guildId);
+    if (!guild) throw new Error('The bot is not in this Discord server');
+
+    const voiceChannel = guild.channels.cache.get(channelId);
+    if (voiceChannel && voiceChannel.isVoiceBased()) {
+      const botMember = guild.members.me ?? (await guild.members.fetch(this.client.user!.id).catch(() => null));
+      if (botMember) {
+        const perms = voiceChannel.permissionsFor(botMember);
+        if (!perms?.has('ViewChannel')) {
+          throw new Error(`The bot cannot view voice channel "${voiceChannel.name}". Grant "View Channel" or Administrator to the bot in Discord.`);
+        }
+        if (!perms?.has('Connect')) {
+          throw new Error(`The bot cannot connect to voice channel "${voiceChannel.name}". Grant "Connect" or Administrator to the bot in Discord.`);
+        }
+      }
+    }
+
     let player = this.shoukaku.players.get(guildId);
     if (player) {
       const activeChannelId = this.shoukaku.connections.get(guildId)?.channelId;
@@ -564,10 +668,12 @@ export class MusicManager {
     const node = this.shoukaku.options.nodeResolver(this.shoukaku.nodes);
     if (!node) throw new Error('No Lavalink nodes available');
 
+    const shardId = guild.shardId ?? 0;
+
     player = await this.shoukaku.joinVoiceChannel({
       guildId,
       channelId,
-      shardId: 0,
+      shardId,
       deaf: true,
     });
 
@@ -661,6 +767,18 @@ export class MusicManager {
       }
 
       const [first, ...remaining] = tracks;
+      // If playing a single track while something is already playing or queued,
+      // change to play this track immediately without destroying the existing queue!
+      if (tracks.length === 1 && (queue.current || queue.tracks.length > 0)) {
+        const existingIdx = queue.tracks.findIndex(
+          (t) => (t.url && t.url === first.url) || (t.identifier && t.identifier === first.identifier)
+        );
+        if (existingIdx !== -1) {
+          queue.tracks.splice(existingIdx, 1);
+        }
+        return this.playTrackLocked(guildId, first, this.nextPlaybackGeneration(guildId));
+      }
+
       queue.clear();
       if (queue.addMany(remaining) !== remaining.length) {
         throw new Error(`Queue limit is ${queue.maxSize} tracks`);
@@ -675,6 +793,10 @@ export class MusicManager {
     generation: number
   ): Promise<boolean> {
     const queue = this.getQueue(guildId);
+    if (queue.current && queue.current !== track) {
+      queue.history.push(queue.current);
+      if (queue.history.length > 100) queue.history.shift();
+    }
     queue.current = track;
 
     const player = this.shoukaku.players.get(guildId);
@@ -696,6 +818,7 @@ export class MusicManager {
       generation,
       triedNodes: new Set(),
       handledFailures: new Set(),
+      triedEncodings: new Set(track.encoded ? [track.encoded] : []),
       pendingFailures: [],
       recovering: false,
       announced: false,

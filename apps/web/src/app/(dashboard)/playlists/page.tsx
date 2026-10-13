@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import type { PlayerTrack, PlaylistSummary, PlaylistDetail, PlaylistTrack } from '@/lib/types';
 import { Icon } from '@/components/icons';
@@ -28,6 +29,15 @@ function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
   return fallback;
+}
+
+function shuffleArray<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 function PlaylistsContent() {
@@ -256,26 +266,53 @@ function PlaylistsContent() {
     return `${m}:${(s % 60).toString().padStart(2, '0')}`;
   };
 
-  const handlePlay = async (track: PlaylistTrack, action: 'play' | 'queue') => {
+  const handlePlay = async (track: PlaylistTrack, action: 'play' | 'queue', trackIndex?: number) => {
     if (!selectedGuild) return alert("Please select a server at the top right.");
     try {
-      await api.post('/player/play', {
-        guild_id: selectedGuild,
-        track: {
-          title: track.track_title,
-          author: track.track_author || 'Unknown Artist',
-          url: track.track_url,
-          identifier: track.track_identifier || undefined,
-          duration: track.duration_ms || 0,
-          artwork_url: track.artwork_url,
-          source: track.source || (track.track_url.includes('spotify') ? 'spotify' : 'youtube'),
-        },
-        action,
-      });
+      if (action === 'queue' || trackIndex === undefined || !selectedPlaylist?.tracks) {
+        await api.post('/player/play', {
+          guild_id: selectedGuild,
+          track: {
+            title: track.track_title,
+            author: track.track_author || 'Unknown Artist',
+            url: track.track_url,
+            identifier: track.track_identifier || undefined,
+            duration: track.duration_ms || 0,
+            artwork_url: track.artwork_url,
+            source: track.source || (track.track_url.includes('spotify') ? 'spotify' : 'youtube'),
+          },
+          action,
+        });
+      } else {
+        // Start from clicked track and queue the rest of the playlist
+        let tracksToSend: PlaylistTrack[];
+        if (shuffleEnabled) {
+          const otherTracks = selectedPlaylist.tracks.filter((_, idx) => idx !== trackIndex);
+          tracksToSend = [track, ...shuffleArray(otherTracks)];
+        } else {
+          tracksToSend = selectedPlaylist.tracks.slice(trackIndex);
+        }
+
+        const mappedTracks = tracksToSend.map((t) => ({
+          title: t.track_title,
+          author: t.track_author || 'Unknown Artist',
+          url: t.track_url,
+          identifier: t.track_identifier || undefined,
+          duration: t.duration_ms || 0,
+          artwork_url: t.artwork_url,
+          source: t.source || (t.track_url.includes('spotify') ? 'spotify' : 'youtube'),
+        }));
+
+        await api.post('/player/play', {
+          guild_id: selectedGuild,
+          tracks: mappedTracks,
+          action: 'play',
+        });
+      }
       setFeedbackId(`${track.id}-${action}`);
       setTimeout(() => setFeedbackId(null), 2000);
     } catch (err: unknown) {
-      alert(getErrorMessage(err, "Failed to play track."));
+      toast.error(getErrorMessage(err, "Failed to play track."));
     }
   };
 
@@ -286,24 +323,21 @@ function PlaylistsContent() {
       await api.delete(`/playlists/${selectedPlaylist.id}/tracks/${trackId}`);
       loadPlaylist(selectedPlaylist.id);
     } catch {
-      alert("Failed to remove track.");
+      toast.error("Failed to remove track.");
     }
   };
 
   const handlePlayPlaylist = async (actionType: 'play' | 'queue') => {
-    if (!selectedGuild) return alert("Please select a server at the top right.");
+    if (!selectedGuild) {
+      toast.error("Please select a server at the top right.");
+      return;
+    }
     if (!selectedPlaylist || !selectedPlaylist.tracks || selectedPlaylist.tracks.length === 0) {
-      return alert("This playlist is empty.");
+      toast.info("This playlist is empty.");
+      return;
     }
 
-    const tracksToSend = [...selectedPlaylist.tracks];
-
-    if (shuffleEnabled) {
-      for (let i = tracksToSend.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [tracksToSend[i], tracksToSend[j]] = [tracksToSend[j], tracksToSend[i]];
-      }
-    }
+    const tracksToSend = shuffleEnabled ? shuffleArray(selectedPlaylist.tracks) : [...selectedPlaylist.tracks];
 
     const mappedTracks = tracksToSend.map(t => ({
       title: t.track_title,
@@ -321,8 +355,9 @@ function PlaylistsContent() {
         tracks: mappedTracks,
         action: actionType,
       });
+      toast.success(actionType === 'play' ? `Playing playlist: ${selectedPlaylist.name}` : `Queued playlist: ${selectedPlaylist.name}`);
     } catch (err: unknown) {
-      alert(getErrorMessage(err, "Failed to play playlist."));
+      toast.error(getErrorMessage(err, "Failed to play playlist."));
     }
   };
 
@@ -334,8 +369,9 @@ function PlaylistsContent() {
       setSelectedPlaylist(null);
       setShowDeleteModal(false);
       loadPlaylists();
+      toast.success("Playlist deleted");
     } catch (err: unknown) {
-      alert(getErrorMessage(err, "Failed to delete playlist."));
+      toast.error(getErrorMessage(err, "Failed to delete playlist."));
     }
   };
 
@@ -532,10 +568,10 @@ function PlaylistsContent() {
                           </div>
 
                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onMouseDown={blurAfterClick} onClick={() => handlePlay(t, 'play')} className="p-2 rounded-full hover:bg-emerald-500 hover:text-emerald-950 text-zinc-300 transition focus:outline-none" title="Play Now">
+                            <button onMouseDown={blurAfterClick} onClick={() => handlePlay(t, 'play', i)} className="p-2 rounded-full hover:bg-emerald-500 hover:text-emerald-950 text-zinc-300 transition focus:outline-none" title="Play Now">
                               {feedbackId === `${t.id}-play` ? <Icon name="check-circle" className="w-4 h-4" /> : <Icon name="play" className="w-4 h-4" />}
                             </button>
-                            <button onMouseDown={blurAfterClick} onClick={() => handlePlay(t, 'queue')} className="p-2 rounded-full hover:bg-white/10 text-zinc-300 transition focus:outline-none" title="Add to Queue">
+                            <button onMouseDown={blurAfterClick} onClick={() => handlePlay(t, 'queue', i)} className="p-2 rounded-full hover:bg-white/10 text-zinc-300 transition focus:outline-none" title="Add to Queue">
                               {feedbackId === `${t.id}-queue` ? <Icon name="check-circle" className="w-4 h-4 text-emerald-400" /> : <Icon name="list-plus" className="w-4 h-4" />}
                             </button>
                             <button onMouseDown={blurAfterClick} onClick={(e) => handleRemoveTrack(t.id, e)} className="p-2 rounded-full hover:bg-red-500/20 hover:text-red-400 text-zinc-500 transition focus:outline-none" title="Remove from Playlist">
