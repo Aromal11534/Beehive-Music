@@ -20,7 +20,7 @@ interface PlaybackAttempt {
   triedNodes: Set<string>;
   handledFailures: Set<string>;
   triedEncodings: Set<string>;
-  pendingFailures: Array<{ nodeName: string; encoded?: string }>;
+  pendingFailures: Array<{ nodeName: string; encoded?: string; reason?: string }>;
   encoded?: string;
   recovering: boolean;
   announced: boolean;
@@ -38,6 +38,17 @@ export class MusicManager {
   private consecutivePlaybackFailures = new Map<string, number>();
   private playbackGenerations = new Map<string, number>();
   private guildOperations = new Map<string, Promise<void>>();
+  private youtubeBlockedUntil: number = 0;
+
+  public isYouTubeBlocked(): boolean {
+    return Date.now() < this.youtubeBlockedUntil;
+  }
+
+  public markYouTubeBlocked(reason?: string): void {
+    const durationMs = 15 * 60 * 1000; // 15 minutes
+    this.youtubeBlockedUntil = Date.now() + durationMs;
+    console.warn(`[Player] YouTube marked as blocked for next 15 minutes (${reason ?? 'bot mitigations'})`);
+  }
 
   constructor(client: Client, redis: RedisService) {
     this.client = client;
@@ -205,15 +216,21 @@ export class MusicManager {
     ).trim();
 
     const isYtOrSpotify = this.isYouTubeOrSpotify(track);
+    const ytBlocked = this.isYouTubeBlocked();
 
     // Build candidate identifiers to try in order of preference.
     const candidateIdentifiers: string[] = [];
 
-    // For YouTube and Spotify tracks:
-    // Direct YouTube video playback on data center IPs is blocked by YouTube bot-detection/sign-in walls.
-    // YouTube Music (ytmsearch) tracks, however, stream reliably via the WEB_REMIX / MUSIC client.
-    // Therefore, always prioritize ytmsearch if title is available.
-    if (isYtOrSpotify && cleanTitle && cleanTitle !== 'Unknown Track') {
+    // If YouTube is currently blocked on the server, prioritize SoundCloud immediately
+    // so track doesn't lag or fail on Google bot-checks!
+    if (ytBlocked && cleanTitle && cleanTitle !== 'Unknown Track') {
+      candidateIdentifiers.push(`scsearch:${cleanTitle} ${cleanAuthor}`.trim());
+      if (cleanAuthor) candidateIdentifiers.push(`scsearch:${cleanTitle}`);
+    }
+
+    // For YouTube and Spotify tracks (when YouTube is healthy):
+    // YouTube Music (ytmsearch) tracks stream reliably via the MUSIC / WEB_REMIX client.
+    if (isYtOrSpotify && cleanTitle && cleanTitle !== 'Unknown Track' && !ytBlocked) {
       candidateIdentifiers.push(`ytmsearch:${cleanTitle} ${cleanAuthor}`.trim());
       if (cleanAuthor) {
         candidateIdentifiers.push(`ytmsearch:${cleanTitle}`);
@@ -224,14 +241,19 @@ export class MusicManager {
     if (directIdentifier && !isYtOrSpotify) {
       // For Soundcloud, Bandcamp, Twitch, Vimeo, etc. direct URL is primary
       candidateIdentifiers.unshift(directIdentifier);
-    } else if (directIdentifier) {
+    } else if (directIdentifier && !ytBlocked) {
       // For YouTube, direct URL is a fallback if ytmsearch finds nothing
       candidateIdentifiers.push(directIdentifier);
     }
 
-    // Also generic ytsearch fallback
+    // Generic fallbacks
     if (cleanTitle && cleanTitle !== 'Unknown Track') {
-      candidateIdentifiers.push(`ytsearch:${cleanTitle} ${cleanAuthor}`.trim());
+      if (!candidateIdentifiers.some((c) => c.startsWith('scsearch:'))) {
+        candidateIdentifiers.push(`scsearch:${cleanTitle} ${cleanAuthor}`.trim());
+      }
+      if (!ytBlocked) {
+        candidateIdentifiers.push(`ytsearch:${cleanTitle} ${cleanAuthor}`.trim());
+      }
     }
 
     for (const identifier of candidateIdentifiers) {
@@ -419,19 +441,21 @@ export class MusicManager {
     guildId: string,
     player: Player,
     nodeName: string,
-    encoded?: string
+    encoded?: string,
+    reason?: string
   ): Promise<void> {
     const attempt = this.playbackAttempts.get(guildId);
     if (!attempt || !this.isCurrentAttempt(guildId, attempt)) return;
 
-    const failureKey = `${nodeName}:${encoded ?? attempt.encoded ?? 'unknown'}`;
+    const failedTrackEncoded = encoded ?? attempt.encoded;
+    const failureKey = `${nodeName}:${failedTrackEncoded ?? 'unknown'}`;
     if (attempt.handledFailures.has(failureKey)) return;
     attempt.handledFailures.add(failureKey);
-    if (encoded) attempt.triedEncodings.add(encoded);
+    if (failedTrackEncoded) attempt.triedEncodings.add(failedTrackEncoded);
     if (attempt.encoded) attempt.triedEncodings.add(attempt.encoded);
 
     if (attempt.recovering) {
-      attempt.pendingFailures.push({ nodeName, encoded });
+      attempt.pendingFailures.push({ nodeName, encoded, reason });
       return;
     }
 
@@ -446,44 +470,84 @@ export class MusicManager {
         recovered = await this.startTrackOnAvailableNode(guildId, player, attempt, fallbackNodes);
       }
 
-      // If node fallback didn't recover, resolve alternate YouTube Music and YouTube streams
+      // If node fallback didn't recover, resolve alternate stream sources
       if (!recovered) {
-        try {
-          const fallbackQuery = `ytmsearch:${attempt.track.title} ${attempt.track.author && attempt.track.author !== 'Unknown' ? attempt.track.author : ''}`.trim();
-          console.warn(`[Player] Playback exception for "${attempt.track.title}" on ${nodeName}; searching fallback via "${fallbackQuery}"`);
-          const result = await player.node.rest.resolve(fallbackQuery);
-          let candidateTracks: Track[] = [];
-          if (result) {
-            if (result.loadType === LoadType.TRACK) candidateTracks = [result.data];
-            else if (result.loadType === LoadType.SEARCH) candidateTracks = result.data;
-            else if (result.loadType === LoadType.PLAYLIST) candidateTracks = result.data.tracks;
+        const cleanTitle = (attempt.track.title || '').trim();
+        const cleanAuthor = (
+          attempt.track.author && attempt.track.author !== 'Unknown' && attempt.track.author !== 'Unknown Artist'
+            ? attempt.track.author
+            : ''
+        ).trim();
+
+        const ytBlocked = this.isYouTubeBlocked() || (reason && (
+          reason.includes('All clients failed') ||
+          reason.includes('bot') ||
+          reason.includes('403') ||
+          reason.includes('requires login') ||
+          reason.includes('Sign in')
+        ));
+
+        const fallbackQueries: string[] = [];
+        if (cleanTitle) {
+          if (ytBlocked) {
+            // Prioritize SoundCloud to instantly recover audio without another failure
+            fallbackQueries.push(`scsearch:${cleanTitle} ${cleanAuthor}`.trim());
+            if (cleanAuthor) fallbackQueries.push(`scsearch:${cleanTitle}`);
+            fallbackQueries.push(`ytmsearch:${cleanTitle} ${cleanAuthor}`.trim());
+          } else {
+            fallbackQueries.push(`ytmsearch:${cleanTitle} ${cleanAuthor}`.trim());
+            fallbackQueries.push(`scsearch:${cleanTitle} ${cleanAuthor}`.trim());
+            if (cleanAuthor) fallbackQueries.push(`scsearch:${cleanTitle}`);
           }
-          // Prioritize Topic / official audio releases
-          const sorted = [...candidateTracks].sort((a, b) => {
-            const aTopic = (a?.info?.author || '').toLowerCase().includes('topic') ? 1 : 0;
-            const bTopic = (b?.info?.author || '').toLowerCase().includes('topic') ? 1 : 0;
-            return bTopic - aTopic;
-          });
-          const fallbackTrack = sorted.find(
-            (t) => t?.encoded && !attempt.triedEncodings.has(t.encoded)
-          );
-          if (fallbackTrack?.encoded) {
-            attempt.triedEncodings.add(fallbackTrack.encoded);
-            attempt.encoded = fallbackTrack.encoded;
-            attempt.track.encoded = fallbackTrack.encoded;
-            attempt.track.url = fallbackTrack.info.uri || attempt.track.url;
-            attempt.track.identifier = fallbackTrack.info.identifier || attempt.track.identifier;
-            await player.playTrack({
-              track: { encoded: fallbackTrack.encoded },
-              paused: false,
-              volume: this.getQueue(guildId).volume,
-            });
-            console.log(`[Player] Fallback stream for "${fallbackTrack.info.title}" started successfully on node ${player.node.name}`);
-            await this.publishState(guildId);
-            recovered = true;
+        }
+
+        for (const query of fallbackQueries) {
+          if (recovered) break;
+          try {
+            console.warn(`[Player] Searching fallback stream for "${cleanTitle}" via "${query}"`);
+            const result = await player.node.rest.resolve(query);
+            let candidates: Track[] = [];
+            if (result) {
+              if (result.loadType === LoadType.TRACK) candidates = [result.data];
+              else if (result.loadType === LoadType.SEARCH) candidates = result.data;
+              else if (result.loadType === LoadType.PLAYLIST) candidates = result.data.tracks;
+            }
+
+            const isYt = query.startsWith('ytmsearch') || query.startsWith('ytsearch');
+            if (isYt) {
+              candidates.sort((a, b) => {
+                const aTopic = (a?.info?.author || '').toLowerCase().includes('topic') ? 1 : 0;
+                const bTopic = (b?.info?.author || '').toLowerCase().includes('topic') ? 1 : 0;
+                return bTopic - aTopic;
+              });
+            }
+
+            const candidate = candidates.find(
+              (t) => t?.encoded && !attempt.triedEncodings.has(t.encoded)
+            );
+
+            if (candidate?.encoded) {
+              attempt.triedEncodings.add(candidate.encoded);
+              attempt.encoded = candidate.encoded;
+              attempt.track.encoded = candidate.encoded;
+              attempt.track.url = candidate.info.uri || attempt.track.url;
+              attempt.track.identifier = candidate.info.identifier || attempt.track.identifier;
+              if (candidate.info.sourceName) attempt.track.source = candidate.info.sourceName;
+
+              await player.playTrack({
+                track: { encoded: candidate.encoded },
+                paused: false,
+                volume: this.getQueue(guildId).volume,
+              });
+
+              console.log(`[Player] Fallback stream (${query.split(':')[0]}) for "${candidate.info.title}" started on node ${player.node.name}`);
+              await this.publishState(guildId);
+              recovered = true;
+              break;
+            }
+          } catch (queryErr) {
+            console.warn(`[Player] Query "${query}" failed during recovery:`, queryErr);
           }
-        } catch (fallbackError) {
-          console.warn(`[Player] Stream fallback failed for "${attempt.track.title}":`, fallbackError);
         }
       }
 
@@ -495,7 +559,7 @@ export class MusicManager {
 
       if (this.isCurrentAttempt(guildId, attempt) && attempt.pendingFailures.length > 0) {
         const pending = attempt.pendingFailures.shift()!;
-        await this.recoverPlayback(guildId, player, pending.nodeName, pending.encoded);
+        await this.recoverPlayback(guildId, player, pending.nodeName, pending.encoded, pending.reason);
       }
     }
   }
@@ -509,7 +573,7 @@ export class MusicManager {
     if (attempt?.encoded && data.track.encoded !== attempt.encoded) return;
 
     if (data.reason === 'loadFailed') {
-      await this.recoverPlayback(guildId, player, player.node.name, data.track.encoded);
+      await this.recoverPlayback(guildId, player, player.node.name, data.track.encoded, 'loadFailed');
       return;
     }
 
@@ -709,10 +773,24 @@ export class MusicManager {
 
     player.on('exception', (error) => {
       const nodeName = player.node.name;
+      const exceptionMessage = (error as any)?.exception?.message || (error as any)?.message || '';
+      const failedEncoded = (error as any)?.track?.encoded || (typeof (error as any)?.track === 'string' ? (error as any).track : undefined);
       console.error(`[Player] Exception on node ${nodeName} in guild ${guildId}:`, error);
+
+      if (
+        exceptionMessage.includes('All clients failed') ||
+        exceptionMessage.includes('bot') ||
+        exceptionMessage.includes('403') ||
+        exceptionMessage.includes('requires login') ||
+        exceptionMessage.includes('Sign in') ||
+        exceptionMessage.includes('unavailable')
+      ) {
+        this.markYouTubeBlocked(exceptionMessage);
+      }
+
       void this.runGuildOperation(
         guildId,
-        () => this.recoverPlayback(guildId, player, nodeName)
+        () => this.recoverPlayback(guildId, player, nodeName, failedEncoded, exceptionMessage)
       ).catch((recoveryError) => {
         console.error(`[Player] Failed to recover playback in guild ${guildId}:`, recoveryError);
       });
@@ -730,7 +808,18 @@ export class MusicManager {
       searchQuery = `${source}:${query}`;
     }
 
-    return this.resolveWithFallback(searchQuery);
+    const result = await this.resolveWithFallback(searchQuery);
+    if (result && result.loadType !== LoadType.EMPTY && result.loadType !== LoadType.ERROR) {
+      return result;
+    }
+
+    // If initial search returned no results or failed, and it wasn't scsearch, try scsearch:
+    if (!query.startsWith('http') && !query.includes(':') && source !== 'scsearch') {
+      console.log(`[Search] Query "${searchQuery}" returned no tracks; falling back to scsearch:${query}`);
+      return this.resolveWithFallback(`scsearch:${query}`);
+    }
+
+    return result;
   }
 
   async playTrack(guildId: string, track: QueueTrack): Promise<boolean> {
