@@ -265,12 +265,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const commitSeek = useCallback(async (value: number) => {
     isDraggingRef.current = false;
+    positionRef.current = value;
+    lastUpdateRef.current = performance.now();
+    setLocalPosition(value);
     const accepted = await sendCommand('seek', value);
-    if (accepted) {
-      positionRef.current = value;
-      lastUpdateRef.current = performance.now();
-      setLocalPosition(value);
-    }
     return accepted;
   }, [sendCommand]);
 

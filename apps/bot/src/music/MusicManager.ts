@@ -503,9 +503,15 @@ export class MusicManager {
 
         for (const query of fallbackQueries) {
           if (recovered) break;
+          if (!this.isCurrentAttempt(guildId, attempt)) break;
           try {
             console.warn(`[Player] Searching fallback stream for "${cleanTitle}" via "${query}"`);
-            const result = await player.node.rest.resolve(query);
+            const resolvePromise = Promise.race([
+              player.node.rest.resolve(query),
+              new Promise<null>((r) => setTimeout(() => r(null), 4000)),
+            ]);
+            const result = await resolvePromise;
+            if (!this.isCurrentAttempt(guildId, attempt)) break;
             let candidates: Track[] = [];
             if (result) {
               if (result.loadType === LoadType.TRACK) candidates = [result.data];
@@ -754,6 +760,15 @@ export class MusicManager {
       await this.publishState(guildId);
     });
 
+    let lastUpdatePublish = 0;
+    player.on('update', async () => {
+      const now = Date.now();
+      if (now - lastUpdatePublish >= 2000) {
+        lastUpdatePublish = now;
+        await this.publishState(guildId);
+      }
+    });
+
     player.on('end', (data) => {
       void this.runGuildOperation(guildId, () => this.handleTrackEnd(guildId, player, data)).catch((error) => {
         console.error(`[Player] Failed to handle track end in guild ${guildId}:`, error);
@@ -765,7 +780,7 @@ export class MusicManager {
       console.warn(`[Player] Track stuck on node ${nodeName} in guild ${guildId}`);
       void this.runGuildOperation(
         guildId,
-        () => this.recoverPlayback(guildId, player, nodeName, data.track.encoded)
+        () => this.recoverPlayback(guildId, player, nodeName, data.track.encoded, 'stuck')
       ).catch((error) => {
         console.error(`[Player] Failed to recover stuck track in guild ${guildId}:`, error);
       });
@@ -928,11 +943,14 @@ export class MusicManager {
 
   async skip(guildId: string): Promise<boolean> {
     return this.runGuildOperation(guildId, async () => {
+      const queue = this.getQueue(guildId);
+      if (!queue.current && queue.tracks.length === 0) return false;
+
       this.invalidatePlayback(guildId);
-      const next = this.getQueue(guildId).next(true);
+      const next = queue.next(true);
       if (!next) {
         await this.stopLocked(guildId);
-        return false;
+        return true;
       }
       return this.playTrackLocked(guildId, next, this.nextPlaybackGeneration(guildId));
     });
@@ -941,11 +959,36 @@ export class MusicManager {
   async playPrevious(guildId: string): Promise<boolean> {
     return this.runGuildOperation(guildId, async () => {
       const queue = this.getQueue(guildId);
-      if (queue.history.length === 0) return false;
-      this.invalidatePlayback(guildId);
-      const previous = queue.previous();
-      if (!previous) return false;
-      return this.playTrackLocked(guildId, previous, this.nextPlaybackGeneration(guildId));
+      const player = this.shoukaku.players.get(guildId);
+
+      if (!queue.current && queue.history.length === 0) return false;
+
+      // If track has been playing for > 3 seconds, standard music player behavior is to restart it
+      if (player && (player.position > 3000 || queue.history.length === 0)) {
+        if (queue.current) {
+          player.position = 0;
+          await player.seekTo(0);
+          await this.publishState(guildId);
+          return true;
+        }
+      }
+
+      if (queue.history.length > 0) {
+        this.invalidatePlayback(guildId);
+        const previous = queue.previous();
+        if (previous) {
+          return this.playTrackLocked(guildId, previous, this.nextPlaybackGeneration(guildId));
+        }
+      }
+
+      if (player && queue.current) {
+        player.position = 0;
+        await player.seekTo(0);
+        await this.publishState(guildId);
+        return true;
+      }
+
+      return false;
     });
   }
 
@@ -1034,8 +1077,13 @@ export class MusicManager {
   async seek(guildId: string, positionMs: number): Promise<boolean> {
     return this.runGuildOperation(guildId, async () => {
       const player = this.shoukaku.players.get(guildId);
-      if (!player || !this.getQueue(guildId).current) return false;
-      await player.seekTo(positionMs);
+      const queue = this.getQueue(guildId);
+      if (!player || !queue.current) return false;
+
+      const duration = queue.current.duration || positionMs;
+      const targetMs = Math.max(0, Math.min(positionMs, duration));
+      player.position = targetMs;
+      await player.seekTo(targetMs);
       await this.publishState(guildId);
       return true;
     });

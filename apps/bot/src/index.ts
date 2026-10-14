@@ -206,11 +206,19 @@ async function main() {
           if (!(await musicManager.resume(guildId))) throw new Error('Nothing is currently paused.');
           break;
         case 'skip': {
-          if (!(await musicManager.skip(guildId))) throw new Error('There is no next track to play.');
+          const queue = musicManager.getQueue(guildId);
+          if (!queue.current && queue.tracks.length === 0) {
+            throw new Error('No tracks in queue to skip.');
+          }
+          await musicManager.skip(guildId);
           break;
         }
         case 'previous': {
-          if (!(await musicManager.playPrevious(guildId))) throw new Error('There is no previous track to play.');
+          const queue = musicManager.getQueue(guildId);
+          if (!queue.current && queue.history.length === 0) {
+            throw new Error('No previous track to play.');
+          }
+          await musicManager.playPrevious(guildId);
           break;
         }
         case 'volume':

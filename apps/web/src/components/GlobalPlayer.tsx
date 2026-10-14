@@ -112,10 +112,13 @@ export function GlobalPlayer() {
   };
 
   const finishSeek = async (value: number) => {
+    setLocalSeek({ trackKey, value });
     if (!(await commitSeek(value))) {
       toast.error(connectionError || 'Live player controls are disconnected.', { id: 'player-connection-error' });
+      setLocalSeek(null);
+    } else {
+      setTimeout(() => setLocalSeek(null), 400);
     }
-    setLocalSeek(null);
   };
 
   const updateVolume = async (volume: number) => {
@@ -147,24 +150,24 @@ export function GlobalPlayer() {
             <button onClick={handleAddFavorite} title="Add to Favorites" className="text-zinc-400 transition hover:text-emerald-400 hover:scale-110">
               <Icon name="star" className="h-4 w-4" />
             </button>
-            <button disabled={controlsDisabled} onClick={() => void runCommand('shuffle')} title="Shuffle" className="text-zinc-400 transition hover:text-white hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40">
+            <button disabled={controlsDisabled || !track} onClick={() => void runCommand('shuffle')} title="Shuffle" className="text-zinc-400 transition hover:text-white hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40">
               <Icon name="shuffle" className="h-4 w-4" />
             </button>
-            <button disabled={controlsDisabled} onClick={() => void runCommand('previous')} title="Previous" className="text-zinc-300 transition hover:text-white hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40">
+            <button disabled={controlsDisabled || !track} onClick={() => void runCommand('previous')} title="Previous / Restart" className="text-zinc-300 transition hover:text-white hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40">
               <Icon name="skip-back" className="h-5 w-5" />
             </button>
             <button
-              disabled={controlsDisabled}
+              disabled={controlsDisabled || !track}
               onClick={() => void runCommand(state?.is_playing ? 'pause' : 'resume')}
               title={state?.is_playing ? 'Pause' : 'Resume'}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Icon name={state?.is_playing ? 'pause' : 'play'} className="h-5 w-5" />
             </button>
-            <button disabled={controlsDisabled} onClick={() => void runCommand('skip')} title="Skip" className="text-zinc-300 transition hover:text-white hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40">
+            <button disabled={controlsDisabled || !track} onClick={() => void runCommand('skip')} title="Skip" className="text-zinc-300 transition hover:text-white hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40">
               <Icon name="skip-forward" className="h-5 w-5" />
             </button>
-            <button disabled={controlsDisabled} onClick={() => void runCommand('loop', state?.loop_mode === 'queue' ? 'off' : 'queue')} title="Loop" className={`${state?.loop_mode !== 'off' ? 'text-emerald-400' : 'text-zinc-400 transition hover:text-white'} disabled:cursor-not-allowed disabled:opacity-40`}>
+            <button disabled={controlsDisabled || !track} onClick={() => void runCommand('loop', state?.loop_mode === 'queue' ? 'off' : 'queue')} title="Loop" className={`${state?.loop_mode !== 'off' ? 'text-emerald-400' : 'text-zinc-400 transition hover:text-white'} disabled:cursor-not-allowed disabled:opacity-40`}>
               <Icon name="repeat" className="h-4 w-4" />
             </button>
             <button onClick={() => setShowPlaylistMenu(true)} title="Add to Playlist" className="text-zinc-400 transition hover:text-emerald-400 hover:scale-110">
@@ -173,16 +176,26 @@ export function GlobalPlayer() {
           </div>
 
           <div className="flex items-center gap-3 text-xs text-zinc-400 font-medium">
-            <span className="w-10 text-right">{formatTime(displayPosition)}</span>
-            <div className="relative h-1.5 flex-1 rounded-full bg-zinc-800">
-              <div className="absolute inset-y-0 left-0 rounded-full bg-white pointer-events-none" style={{ width: `${progress}%` }} />
+            <span className="w-10 text-right tabular-nums">{formatTime(displayPosition)}</span>
+            <div className="group relative h-1.5 flex-1 rounded-full bg-zinc-800 flex items-center cursor-pointer">
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-amber-400 group-hover:bg-amber-300 transition-colors pointer-events-none"
+                style={{ width: `${progress}%` }}
+              />
+              <div
+                className={`absolute h-3.5 w-3.5 -ml-1.75 rounded-full bg-white shadow-lg pointer-events-none transition-all duration-150 ${localSeek || isDraggingRef.current ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'}`}
+                style={{ left: `${progress}%` }}
+              />
               <input
                 type="range"
                 min="0"
                 max={duration}
                 value={displayPosition}
                 disabled={controlsDisabled || duration <= 0}
-                onPointerDown={() => { isDraggingRef.current = true; setLocalSeek({ trackKey, value: localPosition }); }}
+                onPointerDown={() => {
+                  isDraggingRef.current = true;
+                  setLocalSeek({ trackKey, value: displayPosition });
+                }}
                 onPointerUp={(e) => {
                   void finishSeek(Number((e.target as HTMLInputElement).value));
                 }}
@@ -198,7 +211,7 @@ export function GlobalPlayer() {
                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
               />
             </div>
-            <span className="w-10">{formatTime(duration)}</span>
+            <span className="w-10 tabular-nums">{formatTime(duration)}</span>
           </div>
         </div>
 

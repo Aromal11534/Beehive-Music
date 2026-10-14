@@ -27,10 +27,10 @@ lavalink:
       rotation: true
       channelMix: true
       lowPass: true
-    bufferDurationMs: 1000
-    frameBufferDurationMs: 5000
+    bufferDurationMs: 3000
+    frameBufferDurationMs: 7000
     youtubePlaylistLoadLimit: 100
-    playerUpdateInterval: 3
+    playerUpdateInterval: 2
     youtubeSearchEnabled: true
     soundcloudSearchEnabled: true
     gc-warnings: true
